@@ -18,6 +18,7 @@ with Cairo.Png;
 with Cairo.Surface;
 with Glib; use Glib;
 with Art;
+with Hud;
 with Race;
 with Scene;
 with Tracks;
@@ -85,6 +86,33 @@ begin
          Scale (Cr, Gdouble (S), Gdouble (S));
          Set_Source_Surface (Cr, Art.World, 0.0, 0.0);
          Paint (Cr);
+      end;
+   elsif Ada.Environment_Variables.Exists ("SHOT_FRAMES") then
+      --  a run of frames, thirty a second, with the HUD, for animations:
+      --  FILE is then the start of each frame's name
+      declare
+         Frames : constant Positive := Positive'Value (Ada.Environment_Variables.Value ("SHOT_FRAMES"));
+         O : Hud.Overlay;
+      begin
+         O.Mode := Hud.Racing;
+         for F in 1 .. Frames loop
+            for K in 1 .. 4 loop
+               Race.Step ((others => <>), Autopilot => True);
+               for E in Seen .. Race.Event_Serial - 1 loop
+                  Scene.Hear (Race.Events (E mod Race.Event_Ring));
+               end loop;
+               Seen := Race.Event_Serial;
+            end loop;
+            O.Clock := Float (F) / 30.0;
+            Scene.Draw (Cr, W, H, 1.0, 4.0 * Race.Dt);
+            Hud.Draw (Cr, W, H, O);
+            Cairo.Surface.Flush (Surf);
+            declare
+               N : constant String := Natural'Image (10_000 + F);
+            begin
+               St := Cairo.Png.Write_To_Png (Surf, Argument (3) & N (N'First + 2 .. N'Last) & ".png");
+            end;
+         end loop;
       end;
    else
       declare

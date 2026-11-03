@@ -11,6 +11,13 @@ across the road, and you can build tracks of your own. One player races the AI, 
 championships or time trials against a ghost of their best lap. Two players share a keyboard
 and a screen, in a race or a duel. You play it with the keyboard only.
 
+![Racing round Workbench Run](docs/gifs/workbench.gif)
+
+| | |
+|---|---|
+| ![Attic at Night](docs/gifs/attic.gif) | ![Halloween Night](docs/gifs/halloween.gif) |
+| Attic at Night: only the headlights to see by | Halloween Night: broomsticks among the pumpkins |
+
 ![The title screen](docs/screenshots/title.jpg)
 
 | | |
@@ -243,7 +250,8 @@ finishes and that pick-ups are taken. A driver that steers like a keyboard (full
 drives two laps of every track, and two AI drivers fight a duel to the end.
 
 `bin/shot TRACK SECONDS FILE.png [WIDTH HEIGHT [whole]]` draws a picture of a race without a
-window, or with `whole` the whole world. The game reads `ADAMACHINES_AUTOSTART`,
+window, or with `whole` the whole world. With `SHOT_FRAMES=N` it instead writes N frames, thirty a
+second and with the HUD, named FILE0001.png and on; the GIFs above were made from those with ffmpeg. The game reads `ADAMACHINES_AUTOSTART`,
 `ADAMACHINES_AUTOPILOT`, `ADAMACHINES_TRACK`, `ADAMACHINES_MODE` (`RACE_1P`, `RACE_2P`,
 `DUEL_2P`, `CHAMP`, `TRIAL_1P`), `ADAMACHINES_EDITOR`, `ADAMACHINES_SHOT` (a .png file) with
 `ADAMACHINES_SHOT_FRAME`, and `ADAMACHINES_FULLSCREEN`. The pictures above were made with them.
