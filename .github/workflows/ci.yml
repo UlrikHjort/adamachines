@@ -1,0 +1,25 @@
+# Adamachines: build the game and race the AI round every track
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GNAT, gprbuild, GtkAda and PulseAudio
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnat gprbuild libgtkada20-dev libgtk-3-dev libpulse-dev
+
+      - name: Build the game
+        run: make
+
+      - name: Race every track (make test)
+        run: make test

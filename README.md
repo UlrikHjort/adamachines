@@ -1,5 +1,7 @@
 # Adamachines
 
+[![Build and test](https://github.com/UlrikHjort/adamachines/actions/workflows/ci.yml/badge.svg)](https://github.com/UlrikHjort/adamachines/actions/workflows/ci.yml)
+
 Tiny cars, motorcycles, boats, planes, karts, tanks, hovercraft, submarines, monster trucks
 and moon rovers racing round the house, in Ada and GtkAda. Seen from above, they race over a
 workbench, a garden, a frozen pond, the bath, a bedroom, the sky, the kitchen floor, a muddy
@@ -64,7 +66,10 @@ and a screen, in a race or a duel. You play it with the keyboard only.
 
 That needs GNAT, gprbuild, GtkAda and PulseAudio. On Debian, Ubuntu and Mint:
 
-    sudo apt install gnat gprbuild libgtkada-dev libgtk-3-dev libpulse-dev
+    sudo apt install gnat gprbuild libgtkada20-dev libgtk-3-dev libpulse-dev
+
+On other releases the GtkAda package may have another number in its name: `apt search libgtkada`
+finds it.
 
 No OpenGL is needed: everything is drawn with cairo. For the announcer, install `espeak-ng`
 too. Without it the game is just quiet about it.
