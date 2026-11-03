@@ -71,6 +71,9 @@ That needs GNAT, gprbuild, GtkAda and PulseAudio. On Debian, Ubuntu and Mint:
 On other releases the GtkAda package may have another number in its name: `apt search libgtkada`
 finds it.
 
+`make` first checks that all of this is there. If something is missing, it says what, and how to
+install it on your system (apt, dnf, pacman or zypper); `make check` runs just that check.
+
 No OpenGL is needed: everything is drawn with cairo. For the announcer, install `espeak-ng`
 too. Without it the game is just quiet about it.
 

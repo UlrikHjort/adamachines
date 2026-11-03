@@ -5,17 +5,21 @@
 #   make         build the game
 #   make run     build and start it
 #   make test    the headless race check
+#   make check   see that what the build needs is installed (make does this first)
 #   make clean
 
 all: game
 
-game:
+check:
+	@./check-deps.sh
+
+game: check
 	gprbuild -p -P adamachines.gpr -j0
 
 run: game
 	./bin/adamachines
 
-test:
+test: check
 	gprbuild -p -P simtest.gpr -j0
 	./bin/simtest
 
@@ -23,4 +27,4 @@ clean:
 	gprclean -q -P adamachines.gpr
 	gprclean -q -P simtest.gpr
 
-.PHONY: all game run test clean
+.PHONY: all check game run test clean
