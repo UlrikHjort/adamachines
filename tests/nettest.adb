@@ -8,6 +8,9 @@
 --    nettest join find       the same, but finds the game on the network first, as the
 --                            JOIN A GAME screen does, and joins the one it found
 --    nettest second          while a game is hosted here: hosting another must be refused
+--    nettest late ADDRESS    joins while the race is on: it waits in the lobby, is not in
+--                            that race, and is in the lobby when the host comes back to it
+--    nettest host late       hosts as above, and checks the late player is in the lobby after
 --  Both drive like a player at the keyboard.  The race must end with the
 --  joined player's car home, driven by the keys it sent.
 
@@ -106,6 +109,13 @@ begin
                       & Integer'Image (State.Count) & ", lap" & Integer'Image (Integer (R.Best_Lap * 10.0)) & " tenths");
          end if;
       end;
+      if Argument_Count >= 2 and then Argument (2) = "late" then
+         if Net.Lobby.Players /= 3 then
+            Fail ("the player who joined during the race is not in the lobby after it");
+            return;
+         end if;
+         Put_Line ("nettest host: " & Net.Lobby.Names (3) & " joined during the race, for the next one");
+      end if;
       Net.Host_Lobby;
       for K in 1 .. 50 loop
          Net.Poll (0.01);
@@ -119,6 +129,51 @@ begin
       else
          Put_Line ("nettest second: a second game on this machine is refused");
       end if;
+
+   elsif Argument_Count >= 2 and then Argument (1) = "late" then
+      Net.Join (Argument (2), "LATE  ");
+      for Wait in 1 .. 1000 loop
+         Net.Poll (0.01);
+         exit when Net.Joining /= Net.Asking and then Net.Lobby.Players > 0;
+         delay 0.01;
+      end loop;
+      if Net.Joining /= Net.In_Lobby then
+         Fail ("could not join during the race: " & To_String (Net.Refusal));
+         return;
+      elsif not Net.Lobby.In_Race then
+         Fail ("the race was not on yet: started too soon");
+         return;
+      elsif not Net.Waiting_For_Next then
+         Fail ("joined during the race but not told to wait for the next one");
+         return;
+      end if;
+      Put_Line ("nettest late: in the lobby as player" & Natural'Image (Net.Me) & " during the race");
+      declare
+         Back : Boolean := False;
+      begin
+         for Wait in 1 .. 3000 loop
+            Net.Poll (0.01);
+            if Net.Race_Begun then
+               Fail ("was put into the race already on");
+               return;
+            end if;
+            if not Net.Lobby.In_Race then
+               Back := True;
+               exit;
+            end if;
+            exit when Net.Joining = Net.Gone;
+            delay 0.01;
+         end loop;
+         if not Back then
+            Fail ("never saw the host back in the lobby: " & To_String (Net.Refusal));
+            return;
+         elsif Net.Back_In_Lobby or else Net.Waiting_For_Next then
+            Fail ("treated as back from a race it was not in");
+            return;
+         end if;
+      end;
+      Put_Line ("nettest late: the race is over and it is in the lobby, ready for the next");
+      Net.Stop;
 
    elsif Argument_Count >= 2 and then Argument (1) = "join" then
       if Argument (2) = "find" then

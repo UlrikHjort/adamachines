@@ -22,6 +22,7 @@ package body Net is
    Ids : Random_Ids.Generator;
    Ids_Ready : Boolean := False;
    Game_Id : Unsigned_32 := 0;
+   Racing : Natural := 0;   --  as the host: how many players are in the race on now
    Found_Ids : array (1 .. Max_Found) of Unsigned_32 := (others => 0);   --  of the games found
 
    type Message is (M_Look, M_Here, M_Ask, M_Welcome, M_Refuse, M_Lobby, M_Keys, M_State, M_Bye);
@@ -294,6 +295,7 @@ package body Net is
 
    procedure Host_Start is
    begin
+      Racing := Lobby.Players;
       Lobby.In_Race := True;
       Lobby.Serial := Lobby.Serial + 1;
       for K in 2 .. Lobby.Players loop
@@ -306,6 +308,7 @@ package body Net is
    procedure Host_Lobby is
    begin
       Lobby.In_Race := False;
+      Racing := 0;
       --  those who left during the race are gone for good now
       for K in reverse 2 .. Lobby.Players loop
          if Peers (K).Lost then
@@ -593,7 +596,7 @@ package body Net is
          return;
       end if;
       Write_State (W);
-      for K in 2 .. Lobby.Players loop
+      for K in 2 .. Natural'Min (Racing, Lobby.Players) loop   --  not those waiting for the next race
          if Peers (K).Active and then not Peers (K).Lost then
             Send (W, Peers (K).Addr);
          end if;
@@ -612,6 +615,10 @@ package body Net is
    Fire_Count : Unsigned_16 := 0;
    Seen_Serial : Natural := 0;
    Was_In_Race : Boolean := False;
+   First_Lobby : Boolean := True;   --  none heard yet since joining
+   Waiting : Boolean := False;
+
+   function Waiting_For_Next return Boolean is (Waiting);
 
    function Joining return Join_State is (State_Now);
 
@@ -680,6 +687,8 @@ package body Net is
       Last_Tick := 0;
       Seen_Serial := 0;
       Was_In_Race := False;
+      First_Lobby := True;
+      Waiting := False;
       Ask;
    end Join;
 
@@ -767,9 +776,10 @@ package body Net is
                      if Who > 0 then
                         Welcome (Who);   --  it asked again: our welcome was lost
                         Tell_Everyone;
-                     elsif Lobby.In_Race or else Lobby.Players >= Race.Max_Cars then
+                     elsif Lobby.Players >= Race.Max_Cars then
+                        --  during a race a player joins the lobby, for the next one
                         Put_Header (W, M_Refuse);
-                        Put_U8 (W, (if Lobby.In_Race then 1 else 2));
+                        Put_U8 (W, 2);
                         Send (W, From);
                      else
                         Lobby.Players := Lobby.Players + 1;
@@ -867,18 +877,27 @@ package body Net is
                   for K in 1 .. Lobby.Players loop
                      Lobby.Names (K) := Get_Name (R);
                   end loop;
+                  if First_Lobby then
+                     First_Lobby := False;
+                     if Lobby.In_Race then
+                        --  a race already on: not ours, the next one is
+                        Seen_Serial := Lobby.Serial;
+                        Waiting := True;
+                     end if;
+                  end if;
                   if Lobby.In_Race and then Lobby.Serial /= Seen_Serial then
                      Seen_Serial := Lobby.Serial;
                      Begun := True;
                      Last_Tick := 0;
                      Last_Event := Natural'Last;
                   elsif not Lobby.In_Race and then Was_In_Race then
-                     Back := True;
+                     Back := not Waiting;   --  only those who raced come back to it
+                     Waiting := False;
                   end if;
                   Was_In_Race := Lobby.In_Race;
                end if;
             when M_State =>
-               if My_Role = Joined and then From = Host_Addr and then Lobby.In_Race then
+               if My_Role = Joined and then From = Host_Addr and then Lobby.In_Race and then not Waiting then
                   Host_Heard := 0.0;
                   Read_State (R);
                end if;
@@ -973,7 +992,7 @@ package body Net is
                   State_Now := Gone;
                   Refusal := To_Unbounded_String ("THE HOST HAS GONE");
                end if;
-               if not Lobby.In_Race then
+               if not Lobby.In_Race or else Waiting then
                   Send_Keys ((others => 0.0), False);   --  to say we are still here
                end if;
             end if;

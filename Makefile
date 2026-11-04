@@ -24,6 +24,7 @@ test: check
 	./bin/simtest
 	./bin/nettest host & H=$$!; sleep 0.5; ./bin/nettest join 127.0.0.1 && wait $$H
 	./bin/nettest host & H=$$!; sleep 0.5; ./bin/nettest second && ./bin/nettest join find && wait $$H
+	./bin/nettest host late & H=$$!; sleep 0.5; ./bin/nettest join 127.0.0.1 & J=$$!; sleep 1.5; ./bin/nettest late 127.0.0.1 && wait $$J && wait $$H
 
 clean:
 	gprclean -q -P adamachines.gpr

@@ -76,6 +76,8 @@ package Net is
    Refusal : Unbounded_String;   --  why, when refused or gone
    Me : Natural := 0;            --  this player's number, given by the host
 
+   function Waiting_For_Next return Boolean;
+   --  joined while a race was on: in the lobby until the next one
    function Race_Begun return Boolean;     --  a race was started (true once)
    function Back_In_Lobby return Boolean;  --  the host went back to the lobby (true once)
 

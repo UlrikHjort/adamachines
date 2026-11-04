@@ -683,6 +683,11 @@ package body Hud is
                   end loop;
                end;
             end if;
+            if O.Message_T > 0.0 and then Length (O.Message) > 0 then
+               Font (36.0);
+               Set_Source_Rgba (Cr, 1.0, 1.0, 1.0, G (Float'Min (1.0, O.Message_T * 2.0)));
+               Outlined (To_String (O.Message), Sw / 2.0, Sh * 0.86, 0, (1.0, 0.95, 0.7), 6.0);
+            end if;
             Hint_Line (O);
          when Paused =>
             Draw_Race (O);

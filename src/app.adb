@@ -132,6 +132,9 @@ package body App is
    My_Address : Unbounded_String;      --  as the host: where others join
    Net_Steps : Natural := 0;
    Auto_Host_T : Float := 0.0;         --  for the automatic runs: seconds in the lobby
+   Alone_Asked : Boolean := False;     --  the host was asked to start again, nobody having joined
+   Players_Seen : Natural := 0;        --  as the host: to tell when someone joins
+   Held_Key : Gdk.Types.Gdk_Key_Type := 0;   --  Enter, Space or Esc held down: repeats are not presses
 
    function Hosting return Boolean is (Net.Role = Net.Hosting);
    function Client return Boolean is (Net.Role = Net.Joined);
@@ -549,7 +552,7 @@ package body App is
             Overlay.Heading := To_Unbounded_String ("JOIN A GAME");
             for K in 1 .. Net.N_Found loop
                Put (K, Trim_Name (Net.Found (K).Host_Name) & "'S GAME",
-                    (if Net.Found (K).In_Race then "RACING NOW" else Tracks.Name (Net.Found (K).Track))
+                    (if Net.Found (K).In_Race then "RACING: JOIN FOR THE NEXT" else Tracks.Name (Net.Found (K).Track))
                     & "   " & Img (Net.Found (K).Players) & "/" & Img (Race.Max_Cars));
             end loop;
             Put (Net.N_Found + 1, "JOIN BY ADDRESS",
@@ -580,7 +583,11 @@ package body App is
             Info (Img (Net.Lobby.Laps) & " LAPS,  " & Race.Difficulty'Image (Net.Lobby.Level)
                   & ",  PICK-UPS " & On_Off (Net.Lobby.Items));
             Players_Info;
-            Info ("Waiting for " & Trim_Name (Net.Lobby.Names (1)) & " to start the race...");
+            if Net.Waiting_For_Next then
+               Info ("*A RACE IS ON. YOU ARE IN THE NEXT ONE");
+            else
+               Info ("Waiting for " & Trim_Name (Net.Lobby.Names (1)) & " to start the race...");
+            end if;
             Overlay.Hint := To_Unbounded_String (Keys_Hint);
       end case;
       <<Done>>
@@ -822,6 +829,8 @@ package body App is
       L.Level := Level;
       L.Items := Items_On;
       L.AIs := Natural'Min (3, Race.Max_Cars - 1);
+      Alone_Asked := False;
+      Players_Seen := 1;
       My_Address := To_Unbounded_String (Net.Local_Address);
       Net.Changed;
       Mode := Hud.Host_Lobby;
@@ -939,8 +948,14 @@ package body App is
          when Hud.Host_Lobby =>
             case Selected is
                when 1 =>
-                  Net.Host_Start;
-                  Start_Net_Race;
+                  if Net.Lobby.Players <= 1 and then not Alone_Asked then
+                     Alone_Asked := True;
+                     Say ("NOBODY HAS JOINED YET. ENTER AGAIN TO RACE ALONE", 3.0);
+                  else
+                     Alone_Asked := False;
+                     Net.Host_Start;
+                     Start_Net_Race;
+                  end if;
                when 7 => Leave_Net;
                when others => Change (1);
             end case;
@@ -1003,6 +1018,7 @@ package body App is
 
    procedure Menu_Move (Dir : Integer) is
    begin
+      Alone_Asked := False;
       if Overlay.Item_Count > 0 then
          Selected := Turn (Selected, Dir, 1, Overlay.Item_Count);
          Fill_Items;
@@ -1092,6 +1108,14 @@ package body App is
       end if;
       if K = GDK_Shift_L or else K = GDK_Shift_R then
          Shift_Held := True;
+      end if;
+      --  A key held down repeats: for Enter, Space and Esc only the first press counts,
+      --  or one long press would go through several menus at once
+      if K = GDK_Return or else K = GDK_KP_Enter or else K = GDK_space or else K = GDK_Escape then
+         if K = Held_Key then
+            return True;
+         end if;
+         Held_Key := K;
       end if;
       if Editing /= Not_Editing then
          Edit_Key (K);
@@ -1188,6 +1212,9 @@ package body App is
    begin
       if Event.Keyval = GDK_Shift_L or else Event.Keyval = GDK_Shift_R then
          Shift_Held := False;
+      end if;
+      if Event.Keyval = Held_Key then
+         Held_Key := 0;
       end if;
       Set_Key (Event.Keyval, False, Known);
       return Known;
@@ -1522,6 +1549,13 @@ package body App is
          declare
             L : Net.Lobby_Info renames Net.Lobby;
          begin
+            if L.Players > Players_Seen then
+               Say (Trim_Name (L.Names (L.Players))
+                    & (if L.In_Race then " JOINS, FOR THE NEXT RACE" else " JOINS"), 2.5);
+               Audio.Play (Audio.Chime, 0.6);
+               Alone_Asked := False;
+            end if;
+            Players_Seen := L.Players;
             if Mode = Hud.Host_Lobby then
                --  room for everyone who joined
                if L.Players + L.AIs > Race.Max_Cars then
