@@ -841,6 +841,9 @@ package body Race is
          begin
             Tracks.Mover_At (Mv, State.Clock, P, H, Seen, Lift);
             Tracks.Mover_At (Mv, State.Clock - Dt, P2, H2, Seen2, Lift);
+            if Mv.Kind = Tracks.Sleigh and then Seen and then not Seen2 then
+               Tell (Bells, 0, P);   --  here comes Santa
+            end if;
             if Seen then
                declare
                   Mv_V : constant Vec := (if Seen2 then (P - P2) / Dt else Zero);
@@ -864,7 +867,7 @@ package body Race is
                               C.Scare_T := 2.0;
                               Tell (Scared, K, P);
                            end if;
-                        elsif Mv.Kind = Tracks.Train then
+                        elsif Mv.Kind in Tracks.Train | Tracks.Sleigh then
                            declare
                               U : constant Vec := Dir (H);
                               LX : constant Float := Dot (D, U);

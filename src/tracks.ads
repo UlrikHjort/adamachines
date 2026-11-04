@@ -178,6 +178,7 @@ package Tracks is
       Fish, Mouse, Bouncy_Ball, RC_Car, Rolling_Bauble, Astronaut, Bat, Bunny, Knight_Hop, Blob,
       Ghost,   --  floats over the course, and scares off whoever comes too near
       Penguin, Polar_Bear,
+      Sleigh,  --  Santa and his reindeer, dashing across
       Circle_Train);   --  round the Christmas tree: A its middle, B.X how far out
    type Mover is record
       Kind   : Mover_Kind := Marble;

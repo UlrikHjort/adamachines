@@ -161,7 +161,7 @@ Each setting has its own vehicle, its own clutter and something that moves acros
 | *Attic at Night*: dark but for your headlights and the moonlight | rally cars | a mouse |
 | *Birthday Party*: round the cake, through juice and jelly | sports cars | a bouncy ball |
 | *Garage Monsters*: oil stains, toolboxes and spanners on the concrete | monster trucks | a remote control car |
-| *Christmas Tree*: a rug runner round the tree, its train going round | buggies | a rolling bauble |
+| *Christmas Tree*: a rug runner round the tree, its train going round. Now and then Santa dashes across in his sleigh, bells jingling. | buggies | a rolling bauble, and Santa's sleigh |
 | *Moon Base*: across the dust between craters and domes | moon rovers | an astronaut |
 | *Halloween Night*: over the pumpkin patch at night, lit by jack-o'-lanterns, through fog banks. Ghosts float over the course: pass one too close and it scares you off your line with a moan. | broomsticks | bats and ghosts |
 | *Easter Egg Hunt*: a pastel path past painted eggs, chocolate bunnies and straw nests | egg cars | a hopping bunny |

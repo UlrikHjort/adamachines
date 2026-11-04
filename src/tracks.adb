@@ -600,10 +600,10 @@ package body Tracks is
                         else 0.0);
                Heading := Angle_Of (Way) + (if Back then Pi else 0.0);
             end;
-         when Paper_Plane | Bird | Bat =>
+         when Paper_Plane | Bird | Bat | Sleigh =>
             --  one way across, then away for a while
             declare
-               Across : constant Float := (if M.Kind = Train then 0.45 else 0.6);
+               Across : constant Float := (if M.Kind = Sleigh then 0.3 else 0.6);
             begin
                if U < Across then
                   P := M.A + Way * (U / Across);
@@ -613,9 +613,7 @@ package body Tracks is
                   Heading := 0.0;
                   Visible := False;
                end if;
-               if M.Kind /= Train then
-                  Lift := 30.0;
-               end if;
+               Lift := (if M.Kind = Sleigh then 10.0 else 30.0);   --  the sleigh flies low
             end;
       end case;
    end Mover_At;
@@ -1287,6 +1285,16 @@ package body Tracks is
                Movers (N_Movers) := (Ghost, S.P - Across, S.P + Across, 9.0 + 2.0 * Float (K), Float (K) * 3.0, 24.0);
             end;
          end loop;
+      end if;
+      if Def.Theme = Xmas then
+         --  Santa's sleigh, dashing across a straight now and then
+         declare
+            S : constant Sample := Get (N_Samples * 3 / 5);
+            Across : constant Vec := Perp (S.T) * (S.Width * 0.5 + 320.0);
+         begin
+            N_Movers := N_Movers + 1;
+            Movers (N_Movers) := (Sleigh, S.P - Across, S.P + Across, 15.0, 5.0, 19.0);
+         end;
       end if;
       if Def.Theme = Xmas then
          --  the toy train round the tree, in the middle of the room

@@ -128,7 +128,7 @@ package Race is
    type Event_Kind is
      (Bump, Fell, Splash, Jumped, Landed, Boosted, Beep, Go, Lap_Done, Final_Lap,
       Finished, Put_Back, Left_Behind, Point_Won, Duel_Won,
-      Picked, Fired, Dropped, Shielded, Exploded, Spun, Scared);
+      Picked, Fired, Dropped, Shielded, Exploded, Spun, Scared, Bells);
    type Event is record
       Kind : Event_Kind := Beep;
       Car  : Natural := 0;

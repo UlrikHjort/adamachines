@@ -976,6 +976,15 @@ package body App is
                   if Human then
                      Say ("BOO!", 1.2);
                   end if;
+               when Bells =>
+                  Audio.Play (Audio.Jingle, Float'Max (0.5, Lv), Pn);
+                  if Voice_On and then not Muted and then Sound_Volume > 0 and then Racing and then Shot_Frame = 0 then
+                     --  in Santa's own deep voice, whatever the announcer's
+                     Speech.Voice := Speech.Man;
+                     Speech.Loudness := 30 + 17 * Sound_Volume;
+                     Speech.Say ("Ho ho ho!");
+                     Speech.Voice := Voice;
+                  end if;
                when Duel_Won =>
                   Audio.Play (Audio.Fanfare, 0.9);
                   Say (Who (E.Car) & " WINS!", 3.0);

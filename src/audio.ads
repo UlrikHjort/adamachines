@@ -28,7 +28,7 @@ package Audio is
    procedure Set (P : Params);
 
    type Effect is (Thud, Splash, Fall, Jump, Land, Whoosh, Zap, Beep_Low, Beep_High, Lap, Chime, Fanfare,
-                   Pickup, Launch, Bang, Shield_Up, Drop, Moan);
+                   Pickup, Launch, Bang, Shield_Up, Drop, Moan, Jingle);
 
    procedure Play (E : Effect; Level : Float := 1.0; Pan : Float := 0.0);
    --  Level 0 .. 1, Pan -1 left .. 1 right

@@ -379,6 +379,18 @@ package body Audio is
                                  Voice_S := 2.0 * V.Ph1 - 1.0;
                                  X := (Low (V.F1, Voice_S, 420.0) * 2.2 + Low (V.F2, Noise, 900.0) * 0.25) * Env;
                               end;
+                           when Jingle =>
+                              --  sleigh bells: little bells struck again and again, fading away
+                              Len := 2.4;
+                              declare
+                                 Beat : constant Float := A - 0.11 * Float'Floor (A / 0.11);
+                                 Ring : constant Float := Exp (-Beat * 28.0);
+                              begin
+                                 X := (Sin (Two_Pi * 2093.0 * A) + 0.7 * Sin (Two_Pi * 2637.0 * A + 1.0)
+                                       + 0.5 * Sin (Two_Pi * 3520.0 * A + 2.0)
+                                       + 0.4 * Low (V.F1, Noise, 8000.0))
+                                   * Ring * 0.16 * (1.0 - A / Len);
+                              end;
                            when Drop =>
                               Len := 0.35;
                               V.Ph1 := V.Ph1 + 310.0 * Dt;

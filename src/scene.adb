@@ -1526,6 +1526,8 @@ package body Scene is
             Shadow_Disc (R, R * 0.5);
          when Ghost =>
             null;   --  a ghost casts no shadow
+         when Sleigh =>
+            Shadow_Disc (92.0, 19.0);
          when others =>
             Shadow_Disc (R, R);
       end case;
@@ -2077,6 +2079,118 @@ package body Scene is
                Color (0.05, 0.05, 0.05);
                Fill (Cr);
             end;
+         when Sleigh =>
+            --  four reindeer in front, Rudolph leading, then Santa in his sleigh
+            declare
+               Gallop : constant Float := Sin (Clock * 14.0);
+               procedure Reindeer (X, Y : Float; Rudolph : Boolean) is
+               begin
+                  New_Path (Cr);
+                  Save (Cr);
+                  Translate (Cr, G (X), G (Y));
+                  Oval (11.0, 4.5);
+                  Restore (Cr);
+                  Color (0.50, 0.32, 0.18);
+                  Fill (Cr);
+                  New_Path (Cr);
+                  Disc (X + 12.0, Y, 3.5);
+                  Color (0.55, 0.36, 0.20);
+                  Fill (Cr);
+                  Set_Line_Width (Cr, 1.2);
+                  Color (0.40, 0.28, 0.15);
+                  for S in -1 .. 1 loop
+                     if S /= 0 then
+                        Move_To (Cr, G (X + 11.0), G (Y + Float (S) * 2.0));
+                        Line_To (Cr, G (X + 8.0), G (Y + Float (S) * 7.0));
+                        Line_To (Cr, G (X + 10.0), G (Y + Float (S) * 9.0));
+                        Move_To (Cr, G (X + 8.5), G (Y + Float (S) * 6.0));
+                        Line_To (Cr, G (X + 5.0), G (Y + Float (S) * 7.5));
+                     end if;
+                  end loop;
+                  Stroke (Cr);
+                  for Leg in -1 .. 1 loop
+                     if Leg /= 0 then
+                        New_Path (Cr);
+                        Disc (X + Float (Leg) * 6.0 + Gallop * Float (Leg) * 2.0, Y + 4.5, 1.6);
+                        Disc (X + Float (Leg) * 6.0 - Gallop * Float (Leg) * 2.0, Y - 4.5, 1.6);
+                        Color (0.30, 0.20, 0.10);
+                        Fill (Cr);
+                     end if;
+                  end loop;
+                  New_Path (Cr);
+                  Disc (X + 15.5, Y, (if Rudolph then 2.2 else 1.2));
+                  if Rudolph then
+                     Color (1.0, 0.10, 0.08);
+                  else
+                     Color (0.15, 0.10, 0.08);
+                  end if;
+                  Fill (Cr);
+               end Reindeer;
+            begin
+               Cairo.Scale (Cr, 1.35, 1.35);
+               --  the reins
+               Set_Line_Width (Cr, 0.8);
+               Color (0.85, 0.70, 0.25);
+               for S in -1 .. 1 loop
+                  if S /= 0 then
+                     Move_To (Cr, -22.0, G (Float (S) * 5.0));
+                     Line_To (Cr, 52.0, G (Float (S) * 7.0));
+                  end if;
+               end loop;
+               Stroke (Cr);
+               Reindeer (0.0, -7.0, False);
+               Reindeer (0.0, 7.0, False);
+               Reindeer (30.0, -7.0, False);
+               Reindeer (30.0, 7.0, False);
+               Reindeer (58.0, 0.0, True);
+               --  the sleigh, its runners curling up at the front
+               Set_Line_Width (Cr, 2.0);
+               Color (0.85, 0.70, 0.25);
+               for S in -1 .. 1 loop
+                  if S /= 0 then
+                     New_Path (Cr);
+                     Move_To (Cr, -62.0, G (Float (S) * 13.0));
+                     Line_To (Cr, -20.0, G (Float (S) * 13.0));
+                     Curve_To (Cr, -14.0, G (Float (S) * 13.0), -14.0, G (Float (S) * 8.0), -18.0, G (Float (S) * 8.0));
+                     Stroke (Cr);
+                  end if;
+               end loop;
+               New_Path (Cr);
+               Round_Box (-60.0, -11.0, 40.0, 22.0, 6.0);
+               Body_Gradient ((0.85, 0.08, 0.08), 11.0);
+               Fill_Preserve (Cr);
+               Set_Line_Width (Cr, 1.5);
+               Color (0.95, 0.80, 0.30);
+               Stroke (Cr);
+               --  the sack, full of presents
+               New_Path (Cr);
+               Disc (-52.0, 0.0, 9.0);
+               Color (0.55, 0.38, 0.20);
+               Fill (Cr);
+               for K in 0 .. 2 loop
+                  New_Path (Cr);
+                  Rectangle (Cr, G (-56.0 + Float (K) * 3.0), G (-5.0 + Float (K) * 3.0), 4.0, 4.0);
+                  Color (Paint (K + 2));
+                  Fill (Cr);
+               end loop;
+               --  Santa: a red coat, a white beard, his hat with its bobble
+               New_Path (Cr);
+               Disc (-34.0, 0.0, 8.0);
+               Radial (-34.0, 0.0, 8.0, (1.0, 0.25, 0.20), (0.70, 0.05, 0.05));
+               Fill (Cr);
+               New_Path (Cr);
+               Disc (-30.0, 0.0, 4.5);
+               Color (1.0, 1.0, 1.0);
+               Fill (Cr);
+               New_Path (Cr);
+               Disc (-34.0, 0.0, 3.5);
+               Color (0.85, 0.08, 0.08);
+               Fill (Cr);
+               New_Path (Cr);
+               Disc (-37.0, 0.0, 1.8);
+               Color (1.0, 1.0, 1.0);
+               Fill (Cr);
+            end;
          when Train | Circle_Train =>
             --  an engine and two carriages, end to end along its way
             for Part in 0 .. 2 loop
@@ -2165,6 +2279,12 @@ package body Scene is
                   end;
                end if;
                Draw_Mover (M, P, H, Lift);
+               if M.Kind = Tracks.Sleigh and then Dt > 0.0 then
+                  --  a trail of golden sparkles
+                  Spawn (Confetti, P - Dir (H) * 62.0 + Perp (Dir (H)) * (Spread (Rand) * 12.0),
+                         -Dir (H) * 30.0 + Dir (Random (Rand) * 2.0 * Pi) * 20.0,
+                         0.9, 1.4, 0.0, (1.0, 0.85, 0.30));
+               end if;
                if M.Kind in Tracks.Train | Tracks.Circle_Train and then Dt > 0.0 and then Random (Rand) < 0.5 then
                   Spawn (Smoke, P + Dir (H) * (Tracks.Train_Length * 0.5 - 15.0), Dir (Random (Rand) * 2.0 * Pi) * 15.0,
                          1.4, 4.0, 12.0, (0.92, 0.92, 0.95), 0.5);
