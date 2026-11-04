@@ -8,6 +8,7 @@
 with Ada.Command_Line;
 with Ada.Text_IO; use Ada.Text_IO;
 with Cars;
+with Net;
 with Geom; use Geom;
 with Race; use Race;
 with Tracks;
@@ -177,6 +178,19 @@ begin
       else
          Put_Line ("   the original is unchanged, lap" & Integer (Before)'Image);
       end if;
+   end;
+
+   --  The race as the network sends it: packed and unpacked, it is the same race
+   Setup (14, Single, 5, 1, Normal);
+   for K in 1 .. Natural (20.0 / Dt) loop
+      Step ((others => <>), Autopilot => True);
+   end loop;
+   declare
+      Ok : Boolean;
+   begin
+      Net.Self_Test_Pack (Ok);
+      Put_Line ("A race state sent over the network: " & (if Ok then "comes out the same" else "CHANGED"));
+      Failed := Failed or else not Ok;
    end;
 
    if Failed then

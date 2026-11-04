@@ -4,7 +4,7 @@
 #
 #   make         build the game
 #   make run     build and start it
-#   make test    the headless race check
+#   make test    the headless race checks, and a race over the network between two processes
 #   make check   see that what the build needs is installed (make does this first)
 #   make clean
 
@@ -22,6 +22,7 @@ run: game
 test: check
 	gprbuild -p -P simtest.gpr -j0
 	./bin/simtest
+	./bin/nettest host & H=$$!; sleep 0.5; ./bin/nettest join 127.0.0.1 && wait $$H
 
 clean:
 	gprclean -q -P adamachines.gpr

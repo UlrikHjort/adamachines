@@ -16,12 +16,12 @@ package Race is
 
    Dt : constant := 1.0 / 120.0;
 
-   Max_Cars : constant := 6;
+   Max_Cars : constant := 8;
    subtype Car_Index is Positive range 1 .. Max_Cars;
 
-   type Game_Mode is (Single, Double, Duel, Trial);
+   type Game_Mode is (Single, Double, Duel, Trial, Net);
    --  one player against the AI; two players and the AI; two players head to head;
-   --  one player alone against the clock
+   --  one player alone against the clock; players on other machines, and the AI
 
    type Weapon is (None, Turbo, Shield, Oil, Rocket);
    type Difficulty is (Easy, Normal, Hard);
@@ -50,6 +50,7 @@ package Race is
       Holding   : Weapon := None;   --  the pick-up in hand
       Hold_T    : Float := 0.0;     --  how long it has been held
       Shield_T  : Float := 0.0;
+      Lost      : Boolean := False; --  a player on the network gone: the AI drives for them
       --  The AI
       Lane, Lane_Target : Float := 0.0;
       Lane_T, Stuck_T, Reverse_T, Jam_T : Float := 0.0;
@@ -80,10 +81,23 @@ package Race is
 
    State : State_Type;
 
+   type Key_List is array (Car_Index) of Cars.Controls;
+   type Fire_List is array (Car_Index) of Boolean;
+
    type Input is record
       P1, P2 : Cars.Controls;
       Fire1, Fire2 : Boolean := False;   --  use the pick-up, this step
+      Keys  : Key_List;                  --  in a network race, by player number
+      Fires : Fire_List := (others => False);
    end record;
+
+   Local : Positive := 1;   --  in a network race, the number of the player at this screen
+
+   type Name_List is array (Car_Index) of Name_String;
+
+   procedure Setup_Net (Id : Tracks.Track_Id; Players : Positive; Names : Name_List; AIs : Natural;
+                        Laps : Positive; Level : Difficulty; Items : Boolean);
+   --  A race of players on the network (numbered 1 ..), and AI drivers in front of them
 
    procedure Setup (Id : Tracks.Track_Id; Mode : Game_Mode; Opponents : Natural;
                     Laps : Positive; Level : Difficulty; Attract : Boolean := False;
@@ -96,6 +110,10 @@ package Race is
    function Player (N : Positive := 1) return Car_Index; --  the player's car
    function Lap_Shown (I : Car_Index) return Positive;   --  the lap it is on
    function Focus return Car_Index;   --  the car the camera follows
+
+   procedure Follow_Camera (Seconds : Float);
+   --  The camera after its car: the race does this every step; a screen that only
+   --  draws a race run elsewhere does it itself
 
    --  The pick-ups: boxes on the road, oil dropped on it, rockets over it
    Max_Boxes : constant := 18;
@@ -139,6 +157,8 @@ package Race is
    type Event_Array is array (0 .. Event_Ring - 1) of Event;
    Events : Event_Array;
    Event_Serial : Natural := 0;   --  events so far; the latest is at (Serial - 1) mod Ring
+
+   procedure Add_Event (E : Event);   --  one that happened elsewhere, on the host
 
    function Paint_Count return Positive;
 

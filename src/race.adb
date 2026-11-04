@@ -9,8 +9,8 @@ package body Race is
    use Tracks;
    use type Cars.Car;
 
-   AI_Names : constant array (1 .. 6) of Name_String :=
-     ("ROSIE ", "MAX   ", "JUNO  ", "OTTO  ", "PIP   ", "KAI   ");
+   AI_Names : constant array (Car_Index) of Name_String :=
+     ("ROSIE ", "MAX   ", "JUNO  ", "OTTO  ", "PIP   ", "KAI   ", "LUNA  ", "FINN  ");
 
    function Paint_Count return Positive is (8);
 
@@ -25,6 +25,12 @@ package body Race is
                when Tracks.Bath | Tracks.Fish_Tank => "SOAP",
                when others => "OIL"),
          when Rocket => "ROCKET");
+
+   procedure Add_Event (E : Event) is
+   begin
+      Events (Event_Serial mod Event_Ring) := E;
+      Event_Serial := Event_Serial + 1;
+   end Add_Event;
 
    procedure Tell (K : Event_Kind; Car : Natural := 0; P : Vec := Zero; Size : Float := 0.0) is
    begin
@@ -65,7 +71,7 @@ package body Race is
       return Float (R.Progress);
    end Score;
 
-   Order : array (1 .. Max_Cars) of Car_Index := (1, 2, 3, 4, 5, 6);
+   Order : array (1 .. Max_Cars) of Car_Index := (1, 2, 3, 4, 5, 6, 7, 8);
 
    function In_Place (K : Positive) return Car_Index is (Order (K));
 
@@ -99,6 +105,8 @@ package body Race is
       case State.Mode is
          when Single | Trial =>
             return Player (1);
+         when Net =>
+            return Player (Local);
          when Double | Duel =>
             declare
                A : constant Car_Index := Player (1);
@@ -296,6 +304,50 @@ package body Race is
       Sort_Places;
       Reset_Camera;
    end Setup;
+
+   procedure Setup_Net (Id : Tracks.Track_Id; Players : Positive; Names : Name_List; AIs : Natural;
+                        Laps : Positive; Level : Difficulty; Items : Boolean)
+   is
+      Count : constant Positive := Positive'Min (Max_Cars, Players + AIs);
+      Robots : constant Natural := Count - Players;
+   begin
+      --  As a race of one player, then the places given to the players and the AI
+      Setup (Id, Single, Robots, Laps, Level, Items => Items);
+      State.Mode := Net;
+      if State.Count /= Count then
+         --  more players than a single race has: the grid filled again
+         State.Count := Count;
+      end if;
+      for I in 1 .. Count loop
+         declare
+            R : Racer renames State.Racers (I);
+            P : Vec;
+            H : Float;
+         begin
+            R := (others => <>);
+            if I > Robots then
+               R.Human := I - Robots;
+               R.Name := Names (R.Human);
+               R.Paint := (R.Human - 1) mod Paint_Count;
+               R.Pace := 1.0;
+            else
+               R.Name := AI_Names (I);
+               R.Paint := (Players + I - 1) mod Paint_Count;
+               R.Pace :=
+                 (case Level is when Easy => 0.83, when Normal => 0.91, when Hard => 0.985)
+                 * (1.0 - 0.018 * Float (I - 1));
+            end if;
+            Tracks.Grid_Slot (I, P, H);
+            Cars.Place (R.Car, P, H);
+            R.Car.Top_Factor := (if R.Human > 0 then 1.0 else R.Pace);
+            R.Index := Tracks.Nearest (P);
+            R.Progress := (if R.Index > N / 2 then R.Index - N else R.Index);
+            R.Safe := R.Index;
+         end;
+      end loop;
+      Sort_Places;
+      Reset_Camera;
+   end Setup_Net;
 
    ---------------------------------------------------------------------------
    --  The AI
@@ -690,7 +742,7 @@ package body Race is
    --  The step
    ---------------------------------------------------------------------------
 
-   procedure Follow is
+   procedure Follow_Camera (Seconds : Float) is
       F : constant Car_Index := Focus;
       C : Cars.Car renames State.Racers (F).Car;
       Lead : Vec := C.V * 0.32;
@@ -706,10 +758,15 @@ package body Race is
       if Cars.Falling (C) then
          return;
       end if;
-      State.Cam := State.Cam + (C.P + Lead - State.Cam) * Float'Min (1.0, 3.2 * Dt);
+      State.Cam := State.Cam + (C.P + Lead - State.Cam) * Float'Min (1.0, 3.2 * Seconds);
       D := C.P - State.Cam;
       State.Cam.X := State.Cam.X + (D.X - Clamp (D.X, -Margin_X, Margin_X));
       State.Cam.Y := State.Cam.Y + (D.Y - Clamp (D.Y, -Margin_Y, Margin_Y));
+   end Follow_Camera;
+
+   procedure Follow is
+   begin
+      Follow_Camera (Dt);
    end Follow;
 
    function Off_Screen (I : Car_Index) return Boolean is
@@ -737,7 +794,7 @@ package body Race is
          return;
       end if;
       case State.Mode is
-         when Single | Trial => null;
+         when Single | Trial | Net => null;
          when Double =>
             if not State.Racers (O).Finished then
                Put_At (O, Clear_Sample (State.Racers (F).Index - 6), 0.4,
@@ -802,12 +859,14 @@ package body Race is
             R : Racer renames State.Racers (K);
             Ctl : Cars.Controls;
          begin
-            if R.Human = 0 or else Autopilot or else R.Finished
+            if R.Human = 0 or else Autopilot or else R.Finished or else R.Lost
               or else (State.Phase = Over and then State.Mode /= Duel)
             then
                Ctl := AI_Drive (K, (if R.Finished then 0.75
                                     elsif R.Human > 0 then 0.95
                                     else R.Pace));
+            elsif State.Mode = Net then
+               Ctl := I.Keys (R.Human);
             elsif R.Human = 1 then
                Ctl := I.P1;
             else
@@ -915,9 +974,12 @@ package body Race is
             declare
                R : Racer renames State.Racers (K);
             begin
-               if R.Human = 0 or else Autopilot or else R.Finished then
+               if R.Human = 0 or else Autopilot or else R.Finished or else R.Lost then
                   AI_Items (K);
-               elsif (R.Human = 1 and then I.Fire1) or else (R.Human = 2 and then I.Fire2) then
+               elsif (State.Mode = Net and then I.Fires (R.Human))
+                 or else (State.Mode /= Net
+                          and then ((R.Human = 1 and then I.Fire1) or else (R.Human = 2 and then I.Fire2)))
+               then
                   Use_Weapon (K);
                end if;
             end;

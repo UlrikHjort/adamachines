@@ -11,14 +11,16 @@ with Cairo;
 
 package Hud is
 
-   type Screen is (Title, Racing, Paused, Results, Options, Editor);
+   type Screen is (Title, Racing, Paused, Results, Options, Editor,
+                   Net_Menu, Host_Lobby, Browse, Client_Lobby);   --  the network game's screens
 
    type Item is record
       Label, Value : Unbounded_String;
       Arrows       : Boolean := False;   --  a choice changed with left and right
    end record;
    type Item_List is array (1 .. 12) of Item;
-   type Points_Array is array (1 .. 6) of Natural;
+   type Points_Array is array (1 .. 8) of Natural;
+   type Info_Lines is array (1 .. 14) of Unbounded_String;
 
    type Overlay is record
       Mode       : Screen := Title;
@@ -41,6 +43,10 @@ package Hud is
       Fps        : Float := 0.0;
       Show_Fps   : Boolean := False;
       Clock      : Float := 0.0;      --  seconds since the start, for things that move
+      --  The network screens: a heading, and lines of what is what under the menu
+      Heading    : Unbounded_String;
+      Info       : Info_Lines;
+      Info_Count : Natural := 0;
    end record;
 
    procedure Draw (Cr : Cairo.Cairo_Context; Width, Height : Natural; O : Overlay);

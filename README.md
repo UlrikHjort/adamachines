@@ -11,7 +11,8 @@ Halloween, through an Easter egg hunt, across a chess board, on an alien planet 
 the Arctic on snowmobiles. Pick-ups give you turbos, shields, oil and homing rockets. Things move
 across the road, and you can build tracks of your own. One player races the AI, in single races,
 championships or time trials against a ghost of their best lap. Two players share a keyboard
-and a screen, in a race or a duel. You play it with the keyboard only.
+and a screen, in a race or a duel. Up to eight race each other over the network, with AI drivers
+in the empty places. You play it with the keyboard only.
 
 ![Racing round Workbench Run](docs/gifs/workbench.gif)
 
@@ -115,9 +116,33 @@ In the menus: ↑ ↓ to choose, ← → to change, Enter to select, Esc to go b
   standings are shown after every round, and the champion is crowned at the end.
 - **Time trial**: alone against the clock and the ghost of your best lap, which is kept for
   every track.
+- **Network game**: players on other machines race each other, each at their own screen. See
+  below.
 
 The best lap on every track is a **record**, whatever the mode. It's shown on the title screen
 and in a time trial, and the announcer tells you when you set a new one.
+
+## Network game
+
+Choose **NETWORK GAME** on the title screen, then **HOST OR JOIN A GAME**. Type your name first
+under **YOUR NAME**.
+
+- **Host a game**: you choose the track (any built-in one), the laps, the difficulty, pick-ups
+  on or off, and how many AI drivers race too. Up to eight cars race in all, and the AI drivers
+  make room as players join. Start the race when everyone is in. After it you go back to the
+  lobby together for the next one.
+- **Join a game**: games hosted on your own network show up by themselves. Choose one to join
+  it. To join a game somewhere else, choose **JOIN BY ADDRESS** and type the host's address,
+  like `81.12.3.4` or `host.example.org:27272`.
+
+Each player drives with the arrow keys or W A S D, and fires with either Ctrl, either Shift,
+Enter, Space or Q, and the camera follows their own car. If a player drops out, an AI driver
+takes over their car until the end of the race. The game goes on while you're in the pause menu.
+
+The race runs on the host's machine. Every other machine sends its keys and gets the state of
+the race back thirty times a second, all over UDP on port **27272**. To host a game for players
+outside your network, have your router send UDP port 27272 on to your machine, and give them
+the router's public address.
 
 ## Pick-ups
 
@@ -245,6 +270,8 @@ kept in `~/.adamachines/`.
   camera sees each frame: the vehicles, their shadows, the moving hazards, pick-ups, rockets,
   smoke, dust, spray, sparks and the ghost. `hud.adb` draws the panels and the menus, and
   `editor.adb` the editor.
+- **The network** (`net.adb`): the host runs the race and sends its state to every other
+  player; they send their keys. Games on the network are found by a broadcast.
 - **The sound** (`audio.adb`) is all synthesised and played through PulseAudio: an engine for
   each kind of vehicle, the effects and a small looping tune. `speech.adb` has espeak-ng say a
   few words, and `records.adb` keeps the records and ghosts.
@@ -259,10 +286,12 @@ drives two laps of every track, and two AI drivers fight a duel to the end.
 
 `bin/shot TRACK SECONDS FILE.png [WIDTH HEIGHT [whole]]` draws a picture of a race without a
 window, or with `whole` the whole world. With `SHOT_FRAMES=N` it instead writes N frames, thirty a
-second and with the HUD, named FILE0001.png and on; the GIFs above were made from those with ffmpeg. The game reads `ADAMACHINES_AUTOSTART`,
+second and with the HUD, named FILE0001.png and on; the GIFs above were made from those with ffmpeg. `nettest host` and `nettest join 127.0.0.1` race each other over the network
+in two processes; `make test` runs them too. The game reads `ADAMACHINES_AUTOSTART`,
 `ADAMACHINES_AUTOPILOT`, `ADAMACHINES_TRACK`, `ADAMACHINES_MODE` (`RACE_1P`, `RACE_2P`,
 `DUEL_2P`, `CHAMP`, `TRIAL_1P`), `ADAMACHINES_EDITOR`, `ADAMACHINES_SHOT` (a .png file) with
-`ADAMACHINES_SHOT_FRAME`, and `ADAMACHINES_FULLSCREEN`. The pictures above were made with them.
+`ADAMACHINES_SHOT_FRAME`, `ADAMACHINES_FULLSCREEN`, `ADAMACHINES_NET_HOST=N` (host a game and start the race once N
+players are in) and `ADAMACHINES_NET_JOIN=ADDRESS` (join a game). The pictures above were made with them.
 
 ## Licence
 

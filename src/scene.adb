@@ -2561,7 +2561,7 @@ package body Scene is
       L : constant Car_Look := Look;
 
       type Order_Array is array (1 .. Max_Cars) of Car_Index;
-      By_Height : Order_Array := (1, 2, 3, 4, 5, 6);
+      By_Height : Order_Array := (1, 2, 3, 4, 5, 6, 7, 8);
    begin
       Scene.Cr := Cr;
       Clock := Clock + Dt;
@@ -2711,7 +2711,7 @@ package body Scene is
             R : Racer renames State.Racers (I);
          begin
             if R.Human > 0 and then not State.Attract
-              and then (State.Mode in Double | Duel or else State.Phase = Countdown)
+              and then (State.Mode in Double | Duel | Net or else State.Phase = Countdown)
             then
                declare
                   P : constant Vec := Lerp (R.Car.Prev_P, R.Car.P, Alpha) - (0.0, 22.0 + R.Car.Z * 0.6);
@@ -2730,7 +2730,20 @@ package body Scene is
                   Set_Font_Size (Cr, 9.0);
                   Move_To (Cr, G (P.X - 6.0), G (P.Y - 2.0));
                   Color (1.0, 1.0, 1.0);
-                  Show_Text (Cr, (if R.Human = 1 then "P1" else "P2"));
+                  if State.Mode = Net then
+                     declare
+                        N : constant String := R.Name;
+                        L : Natural := N'Last;
+                     begin
+                        while L > N'First and then N (L) = ' ' loop
+                           L := L - 1;
+                        end loop;
+                        Move_To (Cr, G (P.X - 3.0 * Float (L - N'First + 1)), G (P.Y - 2.0));
+                        Show_Text (Cr, N (N'First .. L));
+                     end;
+                  else
+                     Show_Text (Cr, (if R.Human = 1 then "P1" else "P2"));
+                  end if;
                end;
             end if;
          end;

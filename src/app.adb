@@ -30,6 +30,7 @@ with Records;
 with Speech;
 with Geom; use Geom;
 with Hud;
+with Net;
 with Race;
 with Scene;
 with Tracks;
@@ -44,6 +45,8 @@ package body App is
    use type Race.Phase_Kind;
    use type Tracks.Material;
    use type Tracks.Theme_Kind;
+   use type Net.Role_Kind;
+   use type Net.Join_State;
 
    Window : Gtk.Window.Gtk_Window;
    Area : Gtk.Drawing_Area.Gtk_Drawing_Area;
@@ -54,7 +57,7 @@ package body App is
    Overlay : Hud.Overlay;
 
    --  The ways to play
-   type Play_Mode is (Race_1P, Race_2P, Duel_2P, Champ, Trial_1P);
+   type Play_Mode is (Race_1P, Race_2P, Duel_2P, Champ, Trial_1P, Net_Game);
    type Cup_Kind is (Car_Cup, House_Cup, Speed_Cup, Water_Air_Cup, Holiday_Cup, Strange_Cup, Frozen_Cup,
                      Grand_Tour);
    type Track_List is array (Positive range <>) of Tracks.Track_Id;
@@ -120,6 +123,40 @@ package body App is
    Was_Running : Boolean := False;
    Ghost_Step : Natural := 0;
 
+   --  The network game
+   Player_Name : Race.Name_String := "PLAYER";
+   Join_Address : Unbounded_String;
+   type Edit_Kind is (Not_Editing, Editing_Name, Editing_Address);
+   Editing : Edit_Kind := Not_Editing;
+   Edit_Text : Unbounded_String;
+   My_Address : Unbounded_String;      --  as the host: where others join
+   Net_Steps : Natural := 0;
+   Auto_Host_T : Float := 0.0;         --  for the automatic runs: seconds in the lobby
+
+   function Hosting return Boolean is (Net.Role = Net.Hosting);
+   function Client return Boolean is (Net.Role = Net.Joined);
+   function In_Net_Race return Boolean is (Race.State.Mode = Race.Net and then not Race.State.Attract);
+
+   function Trim_Name (N : String) return String is
+      L : Natural := N'Last;
+   begin
+      while L >= N'First and then N (L) = ' ' loop
+         L := L - 1;
+      end loop;
+      return N (N'First .. L);
+   end Trim_Name;
+
+   function As_Name (S : String) return Race.Name_String is
+      R : Race.Name_String := (others => ' ');
+   begin
+      for I in 1 .. Natural'Min (6, S'Length) loop
+         R (I) := (if S (S'First + I - 1) in 'a' .. 'z'
+                   then Character'Val (Character'Pos (S (S'First + I - 1)) - 32)
+                   else S (S'First + I - 1));
+      end loop;
+      return R;
+   end As_Name;
+
    --  The feel of it
    Shake : Float := 0.0;
    Slow_T : Float := 0.0;    --  real seconds of slow motion left
@@ -130,7 +167,8 @@ package body App is
          when Race_1P | Champ => Race.Single,
          when Race_2P => Race.Double,
          when Duel_2P => Race.Duel,
-         when Trial_1P => Race.Trial);
+         when Trial_1P => Race.Trial,
+         when Net_Game => Race.Net);
 
    --  The keys held
    type Pad is record
@@ -206,6 +244,8 @@ package body App is
       Put_Line (F, "sound_volume " & Img (Sound_Volume));
       Put_Line (F, "music_volume " & Img (Music_Volume));
       Put_Line (F, "customs_first " & B (Customs_First));
+      Put_Line (F, "name " & Trim_Name (Player_Name));
+      Put_Line (F, "address " & To_String (Join_Address));
       Put_Line (F, "voice " & (if not Voice_On then "0" elsif Voice = Speech.Woman then "1" else "2"));
       Close (F);
    exception
@@ -225,6 +265,11 @@ package body App is
          declare
             L : constant String := Get_Line (F);
          begin
+            if L'Length > 5 and then L (L'First .. L'First + 4) = "name " then
+               Player_Name := As_Name (L (L'First + 5 .. L'Last));
+            elsif L'Length > 8 and then L (L'First .. L'First + 7) = "address " then
+               Join_Address := To_Unbounded_String (L (L'First + 8 .. L'Last));
+            end if;
             if L'Length > 11 and then L (L'First .. L'First + 10) = "track_name " then
                for Id in Tracks.Track_Id loop
                   if Tracks.Name (Id) = L (L'First + 11 .. L'Last) then
@@ -233,7 +278,10 @@ package body App is
                end loop;
             end if;
             for I in L'Range loop
-               if L (I) = ' ' and then (L'Length <= 11 or else L (L'First .. L'First + 10) /= "track_name ") then
+               if L (I) = ' ' and then (L'Length <= 11 or else L (L'First .. L'First + 10) /= "track_name ")
+                 and then (L'Length <= 5 or else L (L'First .. L'First + 4) /= "name ")
+                 and then (L'Length <= 8 or else L (L'First .. L'First + 7) /= "address ")
+               then
                   declare
                      K : constant String := L (L'First .. I - 1);
                      V : constant Integer := Integer'Value (L (I + 1 .. L'Last));
@@ -300,13 +348,14 @@ package body App is
          when Race_2P => "2 PLAYER RACE",
          when Duel_2P => "2 PLAYER DUEL",
          when Champ => "CHAMPIONSHIP",
-         when Trial_1P => "TIME TRIAL");
+         when Trial_1P => "TIME TRIAL",
+         when Net_Game => "NETWORK GAME");
 
    function Max_Opponents return Natural is
      (case Play is
          when Race_1P | Champ => 5,
          when Race_2P => 4,
-         when Duel_2P | Trial_1P => 0);
+         when Duel_2P | Trial_1P | Net_Game => 0);
 
    function On_Off (B : Boolean) return String is (if B then "ON" else "OFF");
 
@@ -334,21 +383,47 @@ package body App is
       begin
          Overlay.Items (K) := (To_Unbounded_String (L), To_Unbounded_String (V), Arrows);
       end Put;
+      procedure Info (L : String) is
+      begin
+         if Overlay.Info_Count < Overlay.Info'Last then
+            Overlay.Info_Count := Overlay.Info_Count + 1;
+            Overlay.Info (Overlay.Info_Count) := To_Unbounded_String (L);
+         end if;
+      end Info;
+      --  what is being typed, with a blinking cursor
+      function Typing (Kind : Edit_Kind; Shown : String) return String is
+        (if Editing = Kind
+         then To_String (Edit_Text) & (if Integer (Overlay.Clock * 3.0) mod 2 = 0 then "_" else " ")
+         else Shown);
+      procedure Players_Info is
+      begin
+         Info ("*PLAYERS:" & Natural'Image (Net.Lobby.Players) & " OF" & Natural'Image (Race.Max_Cars)
+               & ",  AND" & Natural'Image (Net.Lobby.AIs) & " AI DRIVERS");
+         for K in 1 .. Net.Lobby.Players loop
+            Info (Img (K) & ".  " & Trim_Name (Net.Lobby.Names (K))
+                  & (if K = 1 then "  (THE HOST)" else "")
+                  & (if Client and then K = Net.Me then "  (YOU)" else ""));
+         end loop;
+      end Players_Info;
       Champ_Over : constant Boolean := Champ_Round >= Cup_Tracks (Cup)'Length;
    begin
       Overlay.Hint := Null_Unbounded_String;
       Overlay.Hint2 := Null_Unbounded_String;
       Overlay.Record_Line := Null_Unbounded_String;
+      Overlay.Info_Count := 0;
       case Mode is
          when Hud.Title =>
             Put (1, (case Play is
                         when Duel_2P => "START DUEL",
                         when Champ => "START CHAMPIONSHIP",
                         when Trial_1P => "START TIME TRIAL",
+                        when Net_Game => "HOST OR JOIN A GAME",
                         when others => "START RACE"));
             Put (2, "MODE", Mode_Name (Play), True);
             if Play = Champ then
                Put (3, "CUP", Cup_Name (Cup) & " (" & Img (Cup_Tracks (Cup)'Length) & ")", True);
+            elsif Play = Net_Game then
+               Put (3, "TRACK", "THE HOST CHOOSES");
             else
                Put (3, "TRACK", Tracks.Name (Track_Sel), True);
             end if;
@@ -357,7 +432,7 @@ package body App is
             else
                Put (4, "OPPONENTS", Img (Natural'Min (Opponents, Max_Opponents)), True);
             end if;
-            if Play = Duel_2P then
+            if Play in Duel_2P | Net_Game then
                Put (5, "LAPS", "-");
             else
                Put (5, "LAPS", Img (Laps), True);
@@ -365,6 +440,8 @@ package body App is
             Put (6, "DIFFICULTY", Race.Difficulty'Image (Level), True);
             if Play = Trial_1P then
                Put (7, "PICK-UPS", "OFF");
+            elsif Play = Net_Game then
+               Put (7, "PICK-UPS", "-");
             else
                Put (7, "PICK-UPS", On_Off (Items_On), True);
             end if;
@@ -391,6 +468,15 @@ package body App is
             Overlay.Item_Count := 5;
             Overlay.Hint := To_Unbounded_String (Keys_Hint);
          when Hud.Paused =>
+            if In_Net_Race then
+               --  the race goes on meanwhile
+               Put (1, "BACK TO THE RACE");
+               Put (2, "OPTIONS");
+               Put (3, (if Hosting then "CLOSE THE GAME" else "LEAVE THE GAME"));
+               Overlay.Item_Count := 3;
+               Overlay.Hint := To_Unbounded_String ("The race goes on for the others while you are here.");
+               goto Done;
+            end if;
             Put (1, "RESUME");
             Put (2, "RESTART");
             Put (3, "OPTIONS");
@@ -398,7 +484,17 @@ package body App is
             Overlay.Item_Count := 4;
             Overlay.Hint := To_Unbounded_String (Keys_Hint);
          when Hud.Results =>
-            if Play = Champ then
+            if In_Net_Race then
+               if Hosting then
+                  Put (1, "BACK TO THE LOBBY");
+                  Put (2, "CLOSE THE GAME");
+                  Overlay.Item_Count := 2;
+               else
+                  Put (1, "LEAVE THE GAME");
+                  Overlay.Item_Count := 1;
+                  Overlay.Hint := To_Unbounded_String ("Waiting for the host to go back to the lobby");
+               end if;
+            elsif Play = Champ then
                if Champ_Over then
                   Put (1, "MENU");
                   Overlay.Item_Count := 1;
@@ -418,7 +514,76 @@ package body App is
             end if;
          when Hud.Racing | Hud.Editor =>
             Overlay.Item_Count := 0;
+         when Hud.Net_Menu =>
+            Overlay.Heading := To_Unbounded_String ("NETWORK GAME");
+            Put (1, "HOST A GAME");
+            Put (2, "JOIN A GAME");
+            Put (3, "YOUR NAME", Typing (Editing_Name, Trim_Name (Player_Name)));
+            Put (4, "BACK");
+            Overlay.Item_Count := 4;
+            Info ("*RACE AGAINST PLAYERS ON OTHER MACHINES");
+            Info ("One of you hosts the game: the host chooses the track");
+            Info ("and how many AI drivers race too. Up to 8 cars in all.");
+            Info ("Games on this network are found by themselves; others");
+            Info ("are joined by their address. Everyone uses the arrow");
+            Info ("keys (or W A S D) and Ctrl, Shift or Enter to fire.");
+            Overlay.Hint := To_Unbounded_String
+              ((if Editing = Editing_Name then "type your name, then enter" else Keys_Hint));
+         when Hud.Host_Lobby =>
+            Overlay.Heading := To_Unbounded_String ("YOUR GAME");
+            Put (1, "START THE RACE");
+            Put (2, "TRACK", Tracks.Name (Net.Lobby.Track), True);
+            Put (3, "LAPS", Img (Net.Lobby.Laps), True);
+            Put (4, "AI DRIVERS", Img (Net.Lobby.AIs), True);
+            Put (5, "DIFFICULTY", Race.Difficulty'Image (Net.Lobby.Level), True);
+            Put (6, "PICK-UPS", On_Off (Net.Lobby.Items), True);
+            Put (7, "CLOSE THE GAME");
+            Overlay.Item_Count := 7;
+            Players_Info;
+            Info ("*HOW THE OTHERS JOIN");
+            Info ("On this network the game shows up by itself under JOIN A GAME.");
+            Info ("This machine is " & To_String (My_Address) & " here. Over the internet: your");
+            Info ("router's own address, with UDP port" & Natural'Image (Net.Port) & " sent on to this machine.");
+            Overlay.Hint := To_Unbounded_String (Keys_Hint);
+         when Hud.Browse =>
+            Overlay.Heading := To_Unbounded_String ("JOIN A GAME");
+            for K in 1 .. Net.N_Found loop
+               Put (K, Trim_Name (Net.Found (K).Host_Name) & "'S GAME",
+                    (if Net.Found (K).In_Race then "RACING NOW" else Tracks.Name (Net.Found (K).Track))
+                    & "   " & Img (Net.Found (K).Players) & "/" & Img (Race.Max_Cars));
+            end loop;
+            Put (Net.N_Found + 1, "JOIN BY ADDRESS",
+                 Typing (Editing_Address,
+                         (if Length (Join_Address) = 0 then "TYPE IT" else To_String (Join_Address))));
+            Put (Net.N_Found + 2, "BACK");
+            Overlay.Item_Count := Net.N_Found + 2;
+            if Net.Joining = Net.Asking then
+               Info ("*ASKING TO JOIN...");
+            elsif Net.N_Found = 0 then
+               Info ("*LOOKING FOR GAMES ON THIS NETWORK...");
+               Info ("None yet. A game hosted here or nearby shows up in a moment.");
+            else
+               Info ("*GAMES ON THIS NETWORK");
+               Info ("Choose one to join it.");
+            end if;
+            if Net.Joining in Net.Refused | Net.Gone and then Length (Net.Refusal) > 0 then
+               Info (To_String (Net.Refusal));
+            end if;
+            Info ("A game further away is joined by its address, like 81.12.3.4 or host:27272.");
+            Overlay.Hint := To_Unbounded_String
+              ((if Editing = Editing_Address then "type the address, then enter" else Keys_Hint));
+         when Hud.Client_Lobby =>
+            Overlay.Heading := To_Unbounded_String (Trim_Name (Net.Lobby.Names (1)) & "'S GAME");
+            Put (1, "LEAVE THE GAME");
+            Overlay.Item_Count := 1;
+            Info ("*" & Tracks.Name (Net.Lobby.Track));
+            Info (Img (Net.Lobby.Laps) & " LAPS,  " & Race.Difficulty'Image (Net.Lobby.Level)
+                  & ",  PICK-UPS " & On_Off (Net.Lobby.Items));
+            Players_Info;
+            Info ("Waiting for " & Trim_Name (Net.Lobby.Names (1)) & " to start the race...");
+            Overlay.Hint := To_Unbounded_String (Keys_Hint);
       end case;
+      <<Done>>
       Overlay.Champ := Play = Champ and then Mode = Hud.Results;
       Overlay.Champ_Round := Champ_Round;
       Overlay.Champ_Rounds := Cup_Tracks (Cup)'Length;
@@ -456,6 +621,7 @@ package body App is
       Id : constant Tracks.Track_Id :=
         (if Play = Champ then Cup_Tracks (Cup) (Cup_Tracks (Cup)'First + Champ_Round) else Track_Sel);
    begin
+      Race.Local := 1;
       Race.Setup (Id, Game, (if Play = Champ then Champ_Opponents else Natural'Min (Opponents, Max_Opponents)),
                   Laps, Level, Items => Items_On);
       New_World := True;
@@ -476,6 +642,35 @@ package body App is
                 & Tracks.Name (Id) & ". Get ready!");
    end Start_Race;
 
+   --  A network race: everyone sets it up the same, from the lobby
+   procedure Start_Net_Race is
+      L : Net.Lobby_Info renames Net.Lobby;
+   begin
+      Race.Local := (if Hosting then 1 else Natural'Max (1, Net.Me));
+      Race.Setup_Net (L.Track, Natural'Max (1, L.Players), L.Names, L.AIs, L.Laps, L.Level, L.Items);
+      New_World := True;
+      Mode := Hud.Racing;
+      Overlay.Message_T := 0.0;
+      New_Record := False;
+      Seen_Lap := 0;
+      Was_Running := False;
+      Slow_T := 0.0;
+      Net_Steps := 0;
+      Editing := Not_Editing;
+      Scene.Ghost_On := False;
+      Fill_Items;
+      Announce (Tracks.Name (L.Track) & ". Get ready!");
+   end Start_Net_Race;
+
+   --  The race behind the lobby: on the track chosen there
+   procedure Lobby_Attract is
+   begin
+      if Track_Sel /= Net.Lobby.Track or else not Race.State.Attract then
+         Track_Sel := Net.Lobby.Track;
+         Start_Attract;
+      end if;
+   end Lobby_Attract;
+
    procedure Start_Championship is
    begin
       Champ_Round := 0;
@@ -486,6 +681,10 @@ package body App is
 
    procedure To_Title is
    begin
+      if Net.Role /= Net.Off then
+         Net.Stop;
+      end if;
+      Editing := Not_Editing;
       Mode := Hud.Title;
       Selected := 1;
       Start_Attract;
@@ -528,7 +727,9 @@ package body App is
                   Opponents := Natural'Max ((if Play = Race_2P then 0 else 1), Natural'Min (Opponents, Max_Opponents));
                end if;
             when 3 =>
-               if Play = Champ then
+               if Play = Net_Game then
+                  null;
+               elsif Play = Champ then
                   Cup := Cup_Kind'Val (Turn (Cup_Kind'Pos (Cup), Dir, 0, Cup_Kind'Pos (Cup_Kind'Last)));
                else
                   Track_Sel := Next_Track (Track_Sel, Dir);
@@ -539,13 +740,13 @@ package body App is
                   Opponents := Natural (Turn (Opponents, Dir, (if Play = Race_2P then 0 else 1), Max_Opponents));
                end if;
             when 5 =>
-               if Play /= Duel_2P then
+               if Play not in Duel_2P | Net_Game then
                   Laps := Turn (Laps, Dir, 1, 9);
                end if;
             when 6 =>
                Level := Race.Difficulty'Val (Turn (Race.Difficulty'Pos (Level), Dir, 0, 2));
             when 7 =>
-               if Play /= Trial_1P then
+               if Play not in Trial_1P | Net_Game then
                   Items_On := not Items_On;
                end if;
             when others => null;
@@ -577,6 +778,26 @@ package body App is
             when others => null;
          end case;
          Save_Choices;
+      elsif Mode = Hud.Host_Lobby then
+         declare
+            L : Net.Lobby_Info renames Net.Lobby;
+         begin
+            case Selected is
+               when 2 =>
+                  --  the built-in tracks only: the others would not have yours
+                  L.Track := Turn (L.Track, Dir, 1, Tracks.First_Custom - 1);
+                  Track_Sel := L.Track;
+                  Start_Attract;
+               when 3 => L.Laps := Turn (L.Laps, Dir, 1, 9);
+               when 4 =>
+                  L.AIs := Turn (L.AIs, Dir, (if L.Players <= 1 then 1 else 0),
+                                 Race.Max_Cars - Natural'Max (1, L.Players));
+               when 5 => L.Level := Race.Difficulty'Val (Turn (Race.Difficulty'Pos (L.Level), Dir, 0, 2));
+               when 6 => L.Items := not L.Items;
+               when others => null;
+            end case;
+            Net.Changed;
+         end;
       end if;
       Fill_Items;
    end Change;
@@ -588,13 +809,53 @@ package body App is
       Selected := 1;
    end Open_Options;
 
+   --  Hosting a game, with what was last chosen
+   procedure Begin_Hosting is
+      L : Net.Lobby_Info renames Net.Lobby;
+   begin
+      if not Net.Host (Player_Name) then
+         Say ("A GAME IS HOSTED ON THIS MACHINE ALREADY", 3.0);
+         return;
+      end if;
+      L.Track := (if Tracks.Is_Custom (Track_Sel) then 14 else Track_Sel);
+      L.Laps := Laps;
+      L.Level := Level;
+      L.Items := Items_On;
+      L.AIs := Natural'Min (3, Race.Max_Cars - 1);
+      My_Address := To_Unbounded_String (Net.Local_Address);
+      Net.Changed;
+      Mode := Hud.Host_Lobby;
+      Selected := 1;
+      Lobby_Attract;
+   end Begin_Hosting;
+
+   --  Out of the game, to the network menu
+   procedure Leave_Net is
+   begin
+      Net.Stop;
+      Editing := Not_Editing;
+      Mode := Hud.Net_Menu;
+      Selected := 1;
+      if not Race.State.Attract then
+         Start_Attract;
+      end if;
+   end Leave_Net;
+
+   procedure Join_Game (Address : String) is
+   begin
+      Net.Join (Address, Player_Name);
+   end Join_Game;
+
    procedure Choose is
    begin
       case Mode is
          when Hud.Title =>
             case Selected is
                when 1 =>
-                  if Play = Champ then
+                  if Play = Net_Game then
+                     Mode := Hud.Net_Menu;
+                     Selected := 1;
+                  elsif Play = Champ then
                      Start_Championship;
                   else
                      Start_Race;
@@ -620,6 +881,15 @@ package body App is
                Change (1);
             end if;
          when Hud.Paused =>
+            if In_Net_Race then
+               case Selected is
+                  when 1 => Mode := Hud.Racing;
+                  when 2 => Open_Options;
+                  when others => Leave_Net;
+               end case;
+               Fill_Items;
+               return;
+            end if;
             case Selected is
                when 1 => Mode := Hud.Racing;
                when 2 => Start_Race;
@@ -627,7 +897,16 @@ package body App is
                when others => To_Title;
             end case;
          when Hud.Results =>
-            if Play = Champ then
+            if In_Net_Race then
+               if Hosting and then Selected = 1 then
+                  Net.Host_Lobby;
+                  Mode := Hud.Host_Lobby;
+                  Selected := 1;
+                  Start_Attract;
+               else
+                  Leave_Net;
+               end if;
+            elsif Play = Champ then
                if Selected = 1 and then Champ_Round < Cup_Tracks (Cup)'Length then
                   Start_Race;
                else
@@ -643,9 +922,84 @@ package body App is
                end case;
             end if;
          when Hud.Racing | Hud.Editor => null;
+         when Hud.Net_Menu =>
+            case Selected is
+               when 1 => Begin_Hosting;
+               when 2 =>
+                  Net.Browse;
+                  Mode := Hud.Browse;
+                  Selected := 1;
+               when 3 =>
+                  Editing := Editing_Name;
+                  Edit_Text := To_Unbounded_String (Trim_Name (Player_Name));
+               when others =>
+                  Mode := Hud.Title;
+                  Selected := 1;
+            end case;
+         when Hud.Host_Lobby =>
+            case Selected is
+               when 1 =>
+                  Net.Host_Start;
+                  Start_Net_Race;
+               when 7 => Leave_Net;
+               when others => Change (1);
+            end case;
+         when Hud.Browse =>
+            if Selected <= Net.N_Found then
+               Join_Game (To_String (Net.Found (Selected).Address));
+            elsif Selected = Net.N_Found + 1 then
+               Editing := Editing_Address;
+               Edit_Text := Join_Address;
+            else
+               Leave_Net;
+            end if;
+         when Hud.Client_Lobby =>
+            Leave_Net;
       end case;
       Fill_Items;
    end Choose;
+
+   --  A name or an address being typed
+   procedure Edit_Key (K : Gdk.Types.Gdk_Key_Type) is
+      use Gdk.Types.Keysyms;
+      Code : constant Natural := Natural (K);
+      Most : constant Positive := (if Editing = Editing_Name then 6 else 40);
+   begin
+      if K = GDK_Return or else K = GDK_KP_Enter then
+         if Editing = Editing_Name then
+            if Length (Edit_Text) > 0 then
+               Player_Name := As_Name (To_String (Edit_Text));
+            end if;
+            Editing := Not_Editing;
+         else
+            Editing := Not_Editing;
+            Join_Address := Edit_Text;
+            if Length (Join_Address) > 0 then
+               Join_Game (To_String (Join_Address));
+            end if;
+         end if;
+         Save_Choices;
+      elsif K = GDK_Escape then
+         Editing := Not_Editing;
+      elsif K = GDK_BackSpace then
+         if Length (Edit_Text) > 0 then
+            Delete (Edit_Text, Length (Edit_Text), Length (Edit_Text));
+         end if;
+      elsif Code in 32 .. 126 and then Length (Edit_Text) < Most then
+         declare
+            C : constant Character := Character'Val (Code);
+         begin
+            if Editing = Editing_Name then
+               if C in 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | ' ' | '-' | '!' then
+                  Append (Edit_Text, (if C in 'a' .. 'z' then Character'Val (Code - 32) else C));
+               end if;
+            elsif C in 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '.' | ':' | '-' then
+               Append (Edit_Text, C);
+            end if;
+         end;
+      end if;
+      Fill_Items;
+   end Edit_Key;
 
    procedure Menu_Move (Dir : Integer) is
    begin
@@ -739,6 +1093,10 @@ package body App is
       if K = GDK_Shift_L or else K = GDK_Shift_R then
          Shift_Held := True;
       end if;
+      if Editing /= Not_Editing then
+         Edit_Key (K);
+         return True;
+      end if;
       if Mode = Hud.Editor then
          declare
             Result : Editor.Action;
@@ -776,6 +1134,20 @@ package body App is
                   Mode := Return_To;
                   Selected := 1;
                   Fill_Items;
+               when Hud.Net_Menu =>
+                  Mode := Hud.Title;
+                  Selected := 1;
+                  Fill_Items;
+               when Hud.Host_Lobby | Hud.Browse | Hud.Client_Lobby =>
+                  Leave_Net;
+                  Fill_Items;
+               when Hud.Results =>
+                  if In_Net_Race then
+                     Selected := 2;
+                     Choose;   --  out of the game
+                  else
+                     To_Title;
+                  end if;
                when others => To_Title;
             end case;
          else
@@ -789,7 +1161,7 @@ package body App is
          Fire1_Pending := True;
          return True;
       elsif K = GDK_Control_L or else K = GDK_Shift_L or else K = GDK_space or else K = GDK_LC_q then
-         if Play in Race_1P | Champ | Trial_1P then
+         if Play in Race_1P | Champ | Trial_1P | Net_Game then
             Fire1_Pending := True;
          else
             Fire2_Pending := True;
@@ -829,7 +1201,7 @@ package body App is
    function Player_Input return Race.Input is
       I : Race.Input;
    begin
-      if Play in Race_1P | Champ | Trial_1P then
+      if Play in Race_1P | Champ | Trial_1P | Net_Game then
          --  one player may use either set of keys
          I.P1 := Controls_Of ((Arrows.Left or else Letters.Left, Arrows.Right or else Letters.Right,
                                Arrows.Up or else Letters.Up, Arrows.Down or else Letters.Down));
@@ -878,7 +1250,9 @@ package body App is
          declare
             E : constant Event := Events (K mod Event_Ring);
             Human : constant Boolean :=
-              Racing and then E.Car in 1 .. State.Count and then State.Racers (E.Car).Human > 0;
+              Racing and then E.Car in 1 .. State.Count
+              and then (if State.Mode = Race.Net then State.Racers (E.Car).Human = Local
+                        else State.Racers (E.Car).Human > 0);
             Lv : constant Float := Near_Level (E.P);
             Pn : constant Float := Pan_Of (E.P);
          begin
@@ -935,12 +1309,14 @@ package body App is
                      else
                         Say ((if State.Mode = Double then Who (E.Car) & " " else "")
                              & "FINISHED " & Hud.Ordinal (State.Racers (E.Car).Place), 3.0);
-                        if State.Mode = Single then
+                        if State.Mode in Single | Race.Net then
                            Announce ((if State.Racers (E.Car).Place = 1 then "You win!"
                                       else "You came " & Spoken_Place (State.Racers (E.Car).Place)));
                         end if;
                      end if;
-                     Slow_T := 1.3;
+                     if State.Mode /= Race.Net then
+                        Slow_T := 1.3;   --  not in a network race: it goes on for the others
+                     end if;
                   end if;
                when Left_Behind =>
                   if Racing then
@@ -1002,7 +1378,8 @@ package body App is
       C : Cars.Car renames State.Racers (F).Car;
       P : Audio.Params;
       Best : Float := Float'Last;
-      In_Race : constant Boolean := Mode = Hud.Racing or else Mode = Hud.Results;
+      In_Race : constant Boolean := Mode = Hud.Racing or else Mode = Hud.Results
+        or else (Mode = Hud.Paused and then In_Net_Race);
       I : constant Race.Input := Player_Input;
    begin
       P.Speed := C.Speed;
@@ -1010,7 +1387,7 @@ package body App is
                   else Tracks.Vehicle_Kind'Pos (Tracks.Vehicle));
       P.Throttle :=
         (if State.Racers (F).Human = 0 or else Autopilot or else not In_Race then 0.8
-         elsif State.Racers (F).Human = 2 then I.P2.Throttle
+         elsif State.Racers (F).Human = 2 and then State.Mode /= Race.Net then I.P2.Throttle
          else I.P1.Throttle);
       P.Boost := C.Boost_T > 0.0;
       P.Air := C.Air;
@@ -1031,13 +1408,15 @@ package body App is
          end if;
       end loop;
       P.Music := (if Music_Volume = 0 or else Muted or else Shot_Frame > 0 or else Mode = Hud.Editor then 0
-                  elsif Mode in Hud.Title | Hud.Options then 1
+                  elsif Mode in Hud.Title | Hud.Options | Hud.Net_Menu | Hud.Host_Lobby
+                       | Hud.Browse | Hud.Client_Lobby then 1
                   else 2);
       P.Music_Level := Float (Music_Volume) / 10.0 * (if Mode = Hud.Racing then 0.5 else 0.8);
       P.Master := Float (Sound_Volume) / 10.0
         * (if Muted or else Mode = Hud.Editor then 0.0   --  the editor is a quiet place
            elsif Mode = Hud.Paused then 0.25
-           elsif Mode in Hud.Title | Hud.Options then 0.55 else 1.0);
+           elsif Mode in Hud.Title | Hud.Options | Hud.Net_Menu | Hud.Host_Lobby
+                | Hud.Browse | Hud.Client_Lobby then 0.55 else 1.0);
       Audio.Set (P);
    end Update_Sound;
 
@@ -1084,8 +1463,12 @@ package body App is
 
    procedure Step_World (Dt : Float) is
       Steps : Natural := 0;
+      Net_Race : constant Boolean := In_Net_Race;
    begin
-      if Mode = Hud.Paused then
+      if Net_Race and then Client then
+         return;   --  the host runs the race
+      end if;
+      if not Net_Race and then (Mode = Hud.Paused or else (Mode = Hud.Options and then Return_To = Hud.Paused)) then
          return;
       end if;
       Accum := Accum + Dt;
@@ -1099,7 +1482,18 @@ package body App is
             end if;
             Fire1_Pending := False;
             Fire2_Pending := False;
+            if Net_Race then
+               I.Keys (1) := I.P1;
+               I.Fires (1) := I.Fire1;
+               Net.Host_Inputs (I);
+            end if;
             Race.Step (I, Autopilot => Race.State.Attract or else Autopilot);
+            if Net_Race then
+               Net_Steps := Net_Steps + 1;
+               if Net_Steps mod 4 = 0 then
+                  Net.Host_Send_State;
+               end if;
+            end if;
          end;
          if Play = Trial_1P and then Mode = Hud.Racing and then not Race.State.Attract then
             Trial_Step;
@@ -1114,15 +1508,86 @@ package body App is
 
    procedure Set_View (W, H : Natural) is
       View_H : constant Float :=
-        (if Race.State.Attract or else Race.State.Mode = Race.Single then 520.0 else 600.0);
+        (if Race.State.Attract or else Race.State.Mode in Race.Single | Race.Net then 520.0 else 600.0);
    begin
       Race.State.View_H := View_H;
       Race.State.View_W := View_H * Float (Natural'Max (1, W)) / Float (Natural'Max (1, H));
    end Set_View;
 
+   --  The network, every frame: what came, what to send, where to go
+   procedure Net_Frame (Dt : Float) is
+   begin
+      Net.Poll (Dt);   --  nothing, when no game is hosted or joined
+      if Hosting then
+         declare
+            L : Net.Lobby_Info renames Net.Lobby;
+         begin
+            if Mode = Hud.Host_Lobby then
+               --  room for everyone who joined
+               if L.Players + L.AIs > Race.Max_Cars then
+                  L.AIs := Race.Max_Cars - L.Players;
+                  Net.Changed;
+               end if;
+               if Env ("ADAMACHINES_NET_HOST") /= "" then
+                  Auto_Host_T := Auto_Host_T + Dt;
+                  if L.Players >= Natural'Value (Env ("ADAMACHINES_NET_HOST")) and then Auto_Host_T > 2.0 then
+                     Auto_Host_T := -1000.0;
+                     Net.Host_Start;
+                     Start_Net_Race;
+                  end if;
+               end if;
+            end if;
+         end;
+      elsif Client then
+         if Net.Joining = Net.Gone then
+            declare
+               Why : constant String := To_String (Net.Refusal);
+            begin
+               Leave_Net;
+               Fill_Items;
+               Say ((if Why = "" then "THE HOST HAS GONE" else Why), 3.0);
+            end;
+            return;
+         end if;
+         if Mode = Hud.Browse and then Net.Joining = Net.In_Lobby then
+            Mode := Hud.Client_Lobby;
+            Selected := 1;
+            Editing := Not_Editing;
+         end if;
+         if Net.Race_Begun then
+            Start_Net_Race;
+         elsif Net.Back_In_Lobby then
+            Mode := Hud.Client_Lobby;
+            Selected := 1;
+            Start_Attract;
+         end if;
+         if Mode = Hud.Client_Lobby then
+            Lobby_Attract;
+         end if;
+         if In_Net_Race then
+            declare
+               I : constant Race.Input := (if Mode = Hud.Racing then Player_Input else (others => <>));
+            begin
+               Net.Send_Keys (I.P1, Mode = Hud.Racing and then Fire1_Pending);
+               Fire1_Pending := False;
+               Fire2_Pending := False;
+            end;
+         end if;
+      end if;
+      if Mode in Hud.Net_Menu | Hud.Host_Lobby | Hud.Browse | Hud.Client_Lobby then
+         Fill_Items;
+         if Selected > Natural'Max (1, Overlay.Item_Count) then
+            Selected := Natural'Max (1, Overlay.Item_Count);
+            Fill_Items;
+         end if;
+      end if;
+   end Net_Frame;
+
    procedure Paint_Frame (Cr : Cairo.Cairo_Context; W, H : Natural; Dt : Float) is
    begin
-      Scene.Draw (Cr, W, H, Clamp (Accum / Race.Dt, 0.0, 1.0), Dt);
+      Scene.Draw (Cr, W, H,
+                  (if In_Net_Race and then Client then Clamp (Net.Since_State * 30.0, 0.0, 1.0)
+                   else Clamp (Accum / Race.Dt, 0.0, 1.0)), Dt);
       Hud.Draw (Cr, W, H, Overlay);
    end Paint_Frame;
 
@@ -1168,8 +1633,12 @@ package body App is
          end if;
          return True;
       end if;
+      Net_Frame (Dt);
       Set_View (W, H);
       Step_World (if Slow_T > 0.0 then Dt * 0.3 else Dt);
+      if In_Net_Race and then Client then
+         Race.Follow_Camera (Dt);
+      end if;
       Slow_T := Float'Max (0.0, Slow_T - Dt);
       Shake := Float'Max (0.0, Shake - Dt * 14.0);
       Scene.Shake := Shake;
@@ -1278,6 +1747,18 @@ package body App is
          else
             Start_Race;
          end if;
+      elsif Env ("ADAMACHINES_NET_HOST") /= "" then
+         Play := Net_Game;
+         To_Title;
+         Begin_Hosting;
+         Fill_Items;
+      elsif Env ("ADAMACHINES_NET_JOIN") /= "" then
+         Play := Net_Game;
+         To_Title;
+         Net.Browse;
+         Mode := Hud.Browse;
+         Join_Game (Env ("ADAMACHINES_NET_JOIN"));
+         Fill_Items;
       else
          To_Title;
          if Env ("ADAMACHINES_OPTIONS") /= "" then

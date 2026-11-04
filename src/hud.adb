@@ -281,7 +281,8 @@ package body Hud is
       Text ("/" & Img (State.Count), X0 + 22.0 * Scale + Width_Of ("0000") * 2.2, Y + 76.0 * Scale);
       Font (24.0);
       Color (Scene.Paint (R.Paint));
-      Text ("P" & Img (N), X0 + W - 20.0 * Scale, Y + 42.0 * Scale, Align => 1);
+      Text ((if State.Mode = Net then Trimmed (R.Name) else "P" & Img (N)),
+            X0 + W - 20.0 * Scale, Y + 42.0 * Scale, Align => 1);
       Color (White);
       Font (26.0);
       Text ("LAP " & Img (Lap_Shown (I)) & "/" & Img (State.Laps), X0 + W - 20.0 * Scale, Y + 78.0 * Scale,
@@ -424,6 +425,9 @@ package body Hud is
             Standings (Sw - 24.0 * Scale, 24.0 * Scale);
          when Duel =>
             Duel_Points_Bar;
+         when Net =>
+            Player_Panel (Local, 24.0 * Scale, 24.0 * Scale, False);
+            Standings (Sw - 24.0 * Scale, 24.0 * Scale);
          when Trial =>
             Player_Panel (1, 24.0 * Scale, 24.0 * Scale, False);
             Panel (Sw / 2.0 - 170.0 * Scale, 24.0 * Scale, 340.0 * Scale, 56.0 * Scale);
@@ -651,6 +655,35 @@ package body Hud is
             Hint_Line (O);
          when Editor =>
             null;
+         when Net_Menu | Host_Lobby | Browse | Client_Lobby =>
+            Dim (0.5);
+            Font (70.0);
+            Outlined (To_String (O.Heading), Sw / 2.0, Sh * 0.13, 0, Yellow, 9.0);
+            Menu (O, Sh * 0.18);
+            if O.Info_Count > 0 then
+               declare
+                  Top : constant Float := Sh * 0.18 + 50.0 * Scale * Float (O.Item_Count) + 50.0 * Scale;
+                  Row : constant Float := 30.0 * Scale;
+               begin
+                  Panel (Sw / 2.0 - 420.0 * Scale, Top, 840.0 * Scale, Row * Float (O.Info_Count) + 24.0 * Scale, 0.6);
+                  for K in 1 .. O.Info_Count loop
+                     declare
+                        L : constant String := To_String (O.Info (K));
+                        Head : constant Boolean := L'Length > 0 and then L (L'First) = '*';
+                     begin
+                        Font (21.0, Italic => False, Bold => Head);
+                        if Head then
+                           Color (1.0, 0.85, 0.3);
+                           Text (L (L'First + 1 .. L'Last), Sw / 2.0, Top + 18.0 * Scale + Row * Float (K), Align => 0);
+                        else
+                           Color (1.0, 1.0, 1.0, 0.92);
+                           Text (L, Sw / 2.0, Top + 18.0 * Scale + Row * Float (K), Align => 0);
+                        end if;
+                     end;
+                  end loop;
+               end;
+            end if;
+            Hint_Line (O);
          when Paused =>
             Draw_Race (O);
             Dim (0.5);
@@ -671,7 +704,7 @@ package body Hud is
                Color (White);
                Text (Tracks.Name (Tracks.Current), Sw / 2.0, Sh * 0.18 + 48.0 * Scale, Align => 0);
                declare
-                  R : Racer renames State.Racers (Player (1));
+                  R : Racer renames State.Racers (Player (Local));
                begin
                   Panel (Sw / 2.0 - 380.0 * Scale, Sh * 0.27, 760.0 * Scale, 190.0 * Scale, 0.6);
                   Font (34.0);
@@ -690,7 +723,7 @@ package body Hud is
                Menu (O, Sh * 0.27 + 230.0 * Scale);
             elsif O.Champ then
                declare
-                  P : constant Positive := State.Racers (Player (1)).Place;
+                  P : constant Positive := State.Racers (Player (Local)).Place;
                   Left_W : constant Float := 760.0 * Scale;
                   Gap : constant Float := 30.0 * Scale;
                   X0 : constant Float := Sw / 2.0 - (Left_W + Gap + 420.0 * Scale) / 2.0;
@@ -725,7 +758,7 @@ package body Hud is
                end;
             else
                declare
-                  P : constant Positive := State.Racers (Player (1)).Place;
+                  P : constant Positive := State.Racers (Player (Local)).Place;
                begin
                   Outlined ((if State.Mode = Single then
                                (if P = 1 then "YOU WIN!" else "YOU CAME " & Ordinal (P))
