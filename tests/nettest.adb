@@ -5,6 +5,9 @@
 --  A race over the network, between two processes on this machine:
 --    nettest host            hosts a game, waits for a player, races a lap of the Hockey Rink
 --    nettest join ADDRESS    joins it and drives, from the race state the host sends
+--    nettest join find       the same, but finds the game on the network first, as the
+--                            JOIN A GAME screen does, and joins the one it found
+--    nettest second          while a game is hosted here: hosting another must be refused
 --  Both drive like a player at the keyboard.  The race must end with the
 --  joined player's car home, driven by the keys it sent.
 
@@ -110,8 +113,43 @@ begin
       end loop;
       Net.Stop;
 
+   elsif Argument_Count >= 1 and then Argument (1) = "second" then
+      if Net.Host ("SECOND") then
+         Fail ("a second game was hosted on the port already taken");
+      else
+         Put_Line ("nettest second: a second game on this machine is refused");
+      end if;
+
    elsif Argument_Count >= 2 and then Argument (1) = "join" then
-      Net.Join (Argument (2), "GUEST ");
+      if Argument (2) = "find" then
+         --  asked of the whole network: the game must turn up, once
+         Net.Browse;
+         for Wait in 1 .. 300 loop
+            Net.Poll (0.01);
+            exit when Net.N_Found > 0 and then Wait > 250;   --  time for every answer to come
+            delay 0.01;
+         end loop;
+         if Net.N_Found = 0 then
+            Fail ("no game was found on the network");
+            return;
+         elsif Net.N_Found > 1 then
+            Fail ("the game was found" & Natural'Image (Net.N_Found) & " times");
+            for K in 1 .. Net.N_Found loop
+               Put_Line ("   at " & To_String (Net.Found (K).Address));
+            end loop;
+            return;
+         elsif Net.Found (1).Host_Name /= "HOST  " or else Net.Found (1).Track /= 16
+           or else Net.Found (1).Players /= 1 or else Net.Found (1).In_Race
+         then
+            Fail ("the game found is not the one hosted");
+            return;
+         end if;
+         Put_Line ("nettest join: found " & Net.Found (1).Host_Name & "'s game at "
+                   & To_String (Net.Found (1).Address));
+         Net.Join (To_String (Net.Found (1).Address), "GUEST ");
+      else
+         Net.Join (Argument (2), "GUEST ");
+      end if;
       for Wait in 1 .. 1000 loop
          Net.Poll (0.01);
          exit when Net.Joining /= Net.Asking;
@@ -157,7 +195,7 @@ begin
       end;
       Net.Stop;
    else
-      Put_Line ("nettest host | nettest join ADDRESS");
+      Put_Line ("nettest host | nettest join ADDRESS | nettest join find | nettest second");
       Set_Exit_Status (Failure);
    end if;
 end Nettest;

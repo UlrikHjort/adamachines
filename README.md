@@ -287,7 +287,9 @@ drives two laps of every track, and two AI drivers fight a duel to the end.
 `bin/shot TRACK SECONDS FILE.png [WIDTH HEIGHT [whole]]` draws a picture of a race without a
 window, or with `whole` the whole world. With `SHOT_FRAMES=N` it instead writes N frames, thirty a
 second and with the HUD, named FILE0001.png and on; the GIFs above were made from those with ffmpeg. `nettest host` and `nettest join 127.0.0.1` race each other over the network
-in two processes; `make test` runs them too. The game reads `ADAMACHINES_AUTOSTART`,
+in two processes. `nettest join find` instead finds the game on the network, as the *JOIN A GAME*
+screen does, and checks it is listed once; `nettest second` checks that a second game hosted on
+the same machine is refused. `make test` runs them all. The game reads `ADAMACHINES_AUTOSTART`,
 `ADAMACHINES_AUTOPILOT`, `ADAMACHINES_TRACK`, `ADAMACHINES_MODE` (`RACE_1P`, `RACE_2P`,
 `DUEL_2P`, `CHAMP`, `TRIAL_1P`), `ADAMACHINES_EDITOR`, `ADAMACHINES_SHOT` (a .png file) with
 `ADAMACHINES_SHOT_FRAME`, `ADAMACHINES_FULLSCREEN`, `ADAMACHINES_NET_HOST=N` (host a game and start the race once N

@@ -23,6 +23,7 @@ test: check
 	gprbuild -p -P simtest.gpr -j0
 	./bin/simtest
 	./bin/nettest host & H=$$!; sleep 0.5; ./bin/nettest join 127.0.0.1 && wait $$H
+	./bin/nettest host & H=$$!; sleep 0.5; ./bin/nettest second && ./bin/nettest join find && wait $$H
 
 clean:
 	gprclean -q -P adamachines.gpr

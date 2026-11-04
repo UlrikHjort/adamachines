@@ -2,6 +2,7 @@
 --  Copyright (c) 2026 Ulrik Hørlyk Hjort
 --  SPDX-License-Identifier: MIT
 --
+with Ada.Numerics.Discrete_Random;
 with Ada.Streams; use Ada.Streams;
 with Ada.Unchecked_Conversion;
 with GNAT.Sockets; use GNAT.Sockets;
@@ -13,7 +14,15 @@ package body Net is
    use type Race.Phase_Kind;
    use type Tracks.Material;
 
-   Version : constant := 1;
+   Version : constant := 2;
+
+   --  Every game hosted has a number of its own, so a game that answers on two
+   --  addresses (its own network's and this machine's) is listed once
+   package Random_Ids is new Ada.Numerics.Discrete_Random (Unsigned_32);
+   Ids : Random_Ids.Generator;
+   Ids_Ready : Boolean := False;
+   Game_Id : Unsigned_32 := 0;
+   Found_Ids : array (1 .. Max_Found) of Unsigned_32 := (others => 0);   --  of the games found
 
    type Message is (M_Look, M_Here, M_Ask, M_Welcome, M_Refuse, M_Lobby, M_Keys, M_State, M_Bye);
 
@@ -198,8 +207,13 @@ package body Net is
    function Host (Name : Race.Name_String) return Boolean is
    begin
       Stop;
+      if not Ids_Ready then
+         Random_Ids.Reset (Ids);
+         Ids_Ready := True;
+      end if;
+      Game_Id := Random_Ids.Random (Ids);
       Create_Socket (Socket, Family_Inet, Socket_Datagram);
-      Set_Socket_Option (Socket, Socket_Level, (Reuse_Address, True));
+      --  not shared: a second game hosted on this machine is told the port is taken
       Bind_Socket (Socket, (Family_Inet, Any_Inet_Addr, Port));
       Control_Socket (Socket, Quiet);
       My_Role := Hosting;
@@ -738,6 +752,7 @@ package body Net is
                      W : Writer;
                   begin
                      Put_Header (W, M_Here);
+                     Put_U32 (W, Game_Id);
                      Put_Name (W, Lobby.Names (1));
                      Put_U8 (W, Unsigned_8 (Lobby.Track));
                      Put_U8 (W, Unsigned_8 (Lobby.Players));
@@ -801,6 +816,7 @@ package body Net is
          case M is
             when M_Here =>
                declare
+                  Id : constant Unsigned_32 := Get_U32 (R);
                   Name : constant Race.Name_String := Get_Name (R);
                   Track : constant Natural := Natural (Get_U8 (R));
                   Players : constant Natural := Natural (Get_U8 (R));
@@ -809,16 +825,18 @@ package body Net is
                   Slot : Natural := 0;
                begin
                   for K in 1 .. N_Found loop
-                     if To_String (Found (K).Address) = A then
+                     if Found_Ids (K) = Id then
                         Slot := K;
                      end if;
                   end loop;
                   if Slot = 0 and then N_Found < Max_Found then
                      N_Found := N_Found + 1;
                      Slot := N_Found;
+                     Found (Slot).Address := To_Unbounded_String (A);   --  the first address it answered on
                   end if;
                   if Slot > 0 then
-                     Found (Slot) := (To_Unbounded_String (A), Name,
+                     Found_Ids (Slot) := Id;
+                     Found (Slot) := (Found (Slot).Address, Name,
                                       (if Track in Tracks.Track_Id then Track else 1), Players, In_Race, 0.0);
                   end if;
                end;
@@ -934,6 +952,7 @@ package body Net is
                   Found (K).Age := Found (K).Age + Dt;
                   if Found (K).Age > 3.5 then
                      Found (K .. N_Found - 1) := Found (K + 1 .. N_Found);
+                     Found_Ids (K .. N_Found - 1) := Found_Ids (K + 1 .. N_Found);
                      N_Found := N_Found - 1;
                   end if;
                end loop;
