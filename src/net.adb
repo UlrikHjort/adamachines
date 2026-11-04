@@ -459,6 +459,25 @@ package body Net is
    end Write_State;
 
    Last_Tick : Unsigned_32 := 0;
+   First_Lobby : Boolean := True;   --  none heard yet since joining
+   Waiting : Boolean := False;
+
+   --  The last states that came, by tick, to draw between
+   type Pos_List is array (Race.Car_Index) of Vec;
+   type Angle_List is array (Race.Car_Index) of Float;
+   type Rocket_List is array (1 .. 12) of Vec;
+   type Rocket_Angles is array (1 .. 12) of Float;
+   type Snap is record
+      Tick    : Unsigned_32 := 0;
+      P, V    : Pos_List := (others => (0.0, 0.0));
+      H       : Angle_List := (others => 0.0);
+      Rockets : Natural := 0;
+      RP      : Rocket_List := (others => (0.0, 0.0));
+      RH      : Rocket_Angles := (others => 0.0);
+   end record;
+   Snaps : array (Unsigned_32 range 0 .. 15) of Snap;
+   Play_T : Float := 0.0;   --  the tick drawn, a little behind the last that came
+   Behind : constant := 2.0;   --  ticks of 1/30 s: room for a state late or lost
    Last_Event : Natural := Natural'Last;   --  of the host's: none seen yet
 
    procedure Read_State (R : in out Reader) is
@@ -467,6 +486,13 @@ package body Net is
    begin
       if T <= Last_Tick and then Last_Tick - T < 1_000_000 then
          return;   --  older than what we have
+      end if;
+      if Last_Tick = 0 or else T > Last_Tick + 30 then
+         --  the first of a race, or after a long gap: start drawing from here
+         for S of Snaps loop
+            S.Tick := 0;
+         end loop;
+         Play_T := Float (T) - Behind;
       end if;
       Last_Tick := T;
       State.Phase := Phase_Kind'Val (Integer (Get_U8 (R)) mod 4);
@@ -527,9 +553,13 @@ package body Net is
                   C.Prev_P := C.P;   --  put back on the road: no sliding there
                   C.Prev_H := C.H;
                end if;
+               Snaps (T mod 16).P (K) := C.P;
+               Snaps (T mod 16).V (K) := C.V;
+               Snaps (T mod 16).H (K) := C.H;
             end;
          end loop;
       end;
+      Snaps (T mod 16).Tick := T;
       declare
          Bits : constant Unsigned_32 := Get_U32 (R);
       begin
@@ -560,7 +590,10 @@ package body Net is
             Rockets (K).P.Y := Get_F (R);
             Rockets (K).H := Get_F (R);
             Rockets (K).Life := 1.0;
+            Snaps (T mod 16).RP (K) := Rockets (K).P;
+            Snaps (T mod 16).RH (K) := Rockets (K).H;
          end loop;
+         Snaps (T mod 16).Rockets := Natural'Min (N, Rockets'Length);
       end;
       declare
          Serial : constant Natural := Natural (Get_U32 (R));
@@ -589,6 +622,82 @@ package body Net is
       Since_State := 0.0;
    end Read_State;
 
+   procedure Smooth (Dt : Float) is
+      use Race;
+      Target : constant Float := Float (Last_Tick) - Behind;
+      A, B : Unsigned_32;
+      Found_A, Found_B : Boolean := False;
+      F : Float;
+   begin
+      if My_Role /= Joined or else Waiting or else not Lobby.In_Race or else Last_Tick = 0 then
+         return;
+      end if;
+      --  time runs on as it does, nudged gently to stay the same way behind
+      Play_T := Play_T + Dt * 30.0;
+      if abs (Target - Play_T) > 8.0 then
+         Play_T := Target;
+      else
+         Play_T := Play_T + (Target - Play_T) * Float'Min (1.0, Dt * 2.0);
+      end if;
+      Play_T := Float'Min (Play_T, Float (Last_Tick));
+      --  the states either side of it (one lost on the way is stepped over)
+      declare
+         Base : constant Unsigned_32 := Unsigned_32 (Float'Max (0.0, Float'Floor (Play_T)));
+      begin
+         for D in Unsigned_32 range 0 .. 6 loop
+            exit when D > Base;
+            if Snaps ((Base - D) mod 16).Tick = Base - D and then Base - D > 0 then
+               A := Base - D;
+               Found_A := True;
+               exit;
+            end if;
+         end loop;
+         for D in Unsigned_32 range 1 .. 6 loop
+            if Snaps ((Base + D) mod 16).Tick = Base + D then
+               B := Base + D;
+               Found_B := True;
+               exit;
+            end if;
+         end loop;
+      end;
+      if not Found_A then
+         return;   --  what came last stays as it is
+      end if;
+      if not Found_B then
+         B := A;
+      end if;
+      F := (if B > A then Clamp ((Play_T - Float (A)) / Float (B - A), 0.0, 1.0) else 0.0);
+      declare
+         SA : Snap renames Snaps (A mod 16);
+         SB : Snap renames Snaps (B mod 16);
+      begin
+         for K in 1 .. State.Count loop
+            declare
+               C : Cars.Car renames State.Racers (K).Car;
+            begin
+               if Distance (SA.P (K), SB.P (K)) > 60.0 then
+                  C.P := SB.P (K);   --  put back on the road: no sliding there
+                  C.H := SB.H (K);
+               else
+                  C.P := Lerp (SA.P (K), SB.P (K), F);
+                  C.H := SA.H (K) + Wrap (SB.H (K) - SA.H (K)) * F;
+               end if;
+               C.V := Lerp (SA.V (K), SB.V (K), F);
+               C.Prev_P := C.P;   --  drawn just where it is now
+               C.Prev_H := C.H;
+            end;
+         end loop;
+         if SA.Rockets = SB.Rockets then
+            for K in 1 .. SB.Rockets loop
+               if Distance (SA.RP (K), SB.RP (K)) < 80.0 then
+                  Rockets (K).P := Lerp (SA.RP (K), SB.RP (K), F);
+                  Rockets (K).H := SA.RH (K) + Wrap (SB.RH (K) - SA.RH (K)) * F;
+               end if;
+            end loop;
+         end if;
+      end;
+   end Smooth;
+
    procedure Host_Send_State is
       W : Writer;
    begin
@@ -615,8 +724,6 @@ package body Net is
    Fire_Count : Unsigned_16 := 0;
    Seen_Serial : Natural := 0;
    Was_In_Race : Boolean := False;
-   First_Lobby : Boolean := True;   --  none heard yet since joining
-   Waiting : Boolean := False;
 
    function Waiting_For_Next return Boolean is (Waiting);
 

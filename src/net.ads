@@ -82,7 +82,12 @@ package Net is
    function Back_In_Lobby return Boolean;  --  the host went back to the lobby (true once)
 
    procedure Send_Keys (C : Cars.Controls; Fire : Boolean);
-   Since_State : Float := 0.0;   --  seconds since the last state came, to draw between
+   Since_State : Float := 0.0;   --  seconds since the last state came
+
+   procedure Smooth (Dt : Float);
+   --  In a race joined, every frame: the cars and rockets put where they were a
+   --  moment ago, between two of the states that came, so they move evenly
+   --  however unevenly the states arrive
 
    ---------------------------------------------------------------------------
 

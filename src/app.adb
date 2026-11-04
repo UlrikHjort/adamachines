@@ -1620,7 +1620,7 @@ package body App is
    procedure Paint_Frame (Cr : Cairo.Cairo_Context; W, H : Natural; Dt : Float) is
    begin
       Scene.Draw (Cr, W, H,
-                  (if In_Net_Race and then Client then Clamp (Net.Since_State * 30.0, 0.0, 1.0)
+                  (if In_Net_Race and then Client then 1.0   --  put in place already
                    else Clamp (Accum / Race.Dt, 0.0, 1.0)), Dt);
       Hud.Draw (Cr, W, H, Overlay);
    end Paint_Frame;
@@ -1671,7 +1671,10 @@ package body App is
       Set_View (W, H);
       Step_World (if Slow_T > 0.0 then Dt * 0.3 else Dt);
       if In_Net_Race and then Client then
+         --  the cars where they are to be drawn, and the camera after them smoothly
+         Net.Smooth (Dt);
          Race.Follow_Camera (Dt);
+         Race.State.Prev_Cam := Race.State.Cam;
       end if;
       Slow_T := Float'Max (0.0, Slow_T - Dt);
       Shake := Float'Max (0.0, Shake - Dt * 14.0);
