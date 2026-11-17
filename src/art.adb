@@ -3526,6 +3526,8 @@ package body Art is
    ---------------------------------------------------------------------------
 
    function Ground_Color return RGB is
+     (if Tracks.Table_Count > 1 then (0.12, 0.11, 0.13)   --  past the tables, the floor far below
+      else
      (case Tracks.Theme is
          when Workbench => (0.12, 0.11, 0.13),
          when Garden => (0.12, 0.22, 0.10),
@@ -3549,7 +3551,7 @@ package body Art is
          when Easter => (0.30, 0.50, 0.20),
          when Chess => (0.30, 0.18, 0.10),
          when Alien => (0.10, 0.04, 0.14),
-         when Arctic => (0.78, 0.84, 0.92));
+         when Arctic => (0.78, 0.84, 0.92)));
 
    function Somewhere (X0, Y0, X1, Y1 : Float) return Vec is
       X : constant Float := X0 + Random (Rand) * (X1 - X0);
@@ -4069,6 +4071,235 @@ package body Art is
       return Distance (It.S.C, Get (K).P) < E + Get (K).Width * 0.5;
    end Touches_Road;
 
+   --  A bridge between two tables, along X from -L to L, Y from -W to W
+   procedure Draw_Bridge (B : Tracks.Bridge) is
+      Sh : constant Shape := Bridge_Shape (B);
+      L : constant Float := Sh.RX;
+      W : constant Float := Sh.RY;
+   begin
+      Save (Cr);
+      Translate (Cr, G (Sh.C.X), G (Sh.C.Y));
+      Rotate (Cr, G (Sh.A));
+      case B.Kind is
+         when Ruler_Bridge =>
+            --  a long steel rule, its scale along both edges
+            New_Path (Cr);
+            Rectangle (Cr, G (-L), G (-W), G (2.0 * L), G (2.0 * W));
+            Linear (0.0, -W, 0.0, W, (0.90, 0.91, 0.93), (0.66, 0.68, 0.72));
+            Fill (Cr);
+            Set_Line_Width (Cr, 0.9);
+            Color (0.15, 0.15, 0.18);
+            declare
+               X : Float := -L + 4.0;
+               K : Natural := 0;
+               M : Float;
+            begin
+               while X < L - 2.0 loop
+                  M := (if K mod 10 = 0 then 9.0 elsif K mod 5 = 0 then 6.0 else 3.5);
+                  Move_To (Cr, G (X), G (-W));
+                  Line_To (Cr, G (X), G (-W + M));
+                  Move_To (Cr, G (X), G (W));
+                  Line_To (Cr, G (X), G (W - M));
+                  X := X + 4.0;
+                  K := K + 1;
+               end loop;
+               Stroke (Cr);
+            end;
+            New_Path (Cr);
+            Rectangle (Cr, G (-L), G (-W), G (2.0 * L), G (2.0 * W));
+            Set_Line_Width (Cr, 1.5);
+            Color (0.35, 0.36, 0.40);
+            Stroke (Cr);
+         when Books_Bridge =>
+            --  exercise books laid end to end, one over the next
+            declare
+               Cols : constant array (0 .. 3) of RGB :=
+                 ((0.80, 0.22, 0.20), (0.20, 0.45, 0.75), (0.25, 0.60, 0.30), (0.90, 0.70, 0.20));
+               N : constant Positive := Positive'Max (2, Integer (2.0 * L / 90.0));
+               Each : constant Float := 2.0 * L / Float (N);
+            begin
+               for K in 0 .. N - 1 loop
+                  declare
+                     X : constant Float := -L + Float (K) * Each;
+                     Skew : constant Float := (if K mod 2 = 0 then 3.0 else -3.0);
+                  begin
+                     New_Path (Cr);
+                     Rectangle (Cr, G (X + 2.0), G (-W + 3.0), G (Each + 8.0), G (2.0 * W));
+                     Color (0.0, 0.0, 0.0, 0.25);
+                     Fill (Cr);
+                     New_Path (Cr);
+                     Rectangle (Cr, G (X), G (-W + Skew), G (Each + 6.0), G (2.0 * W - 2.0));
+                     Color (Cols (K mod 4));
+                     Fill (Cr);
+                     --  the pages, seen at the edge, and a label
+                     New_Path (Cr);
+                     Rectangle (Cr, G (X + Each + 2.0), G (-W + Skew), 4.0, G (2.0 * W - 2.0));
+                     Color (0.96, 0.95, 0.88);
+                     Fill (Cr);
+                     New_Path (Cr);
+                     Rectangle (Cr, G (X + Each * 0.3), G (-W * 0.35 + Skew), G (Each * 0.4), G (W * 0.7));
+                     Color (0.97, 0.97, 0.95, 0.9);
+                     Fill (Cr);
+                  end;
+               end loop;
+            end;
+         when Pencil_Bridge =>
+            --  a pencil, longer than any pencil should be
+            New_Path (Cr);
+            Rectangle (Cr, G (-L + 14.0), G (-W), G (2.0 * L - 40.0), G (2.0 * W));
+            Linear (0.0, -W, 0.0, W, (1.0, 0.85, 0.25), (0.75, 0.52, 0.05));
+            Fill (Cr);
+            Set_Line_Width (Cr, 1.0);
+            Color (0.6, 0.42, 0.05, 0.8);
+            Move_To (Cr, G (-L + 14.0), G (-W * 0.33));
+            Line_To (Cr, G (L - 26.0), G (-W * 0.33));
+            Move_To (Cr, G (-L + 14.0), G (W * 0.33));
+            Line_To (Cr, G (L - 26.0), G (W * 0.33));
+            Stroke (Cr);
+            New_Path (Cr);
+            Move_To (Cr, G (L - 26.0), G (-W));
+            Line_To (Cr, G (L), 0.0);
+            Line_To (Cr, G (L - 26.0), G (W));
+            Close_Path (Cr);
+            Color (0.92, 0.78, 0.58);
+            Fill (Cr);
+            New_Path (Cr);
+            Move_To (Cr, G (L - 8.0), G (-W * 0.3));
+            Line_To (Cr, G (L), 0.0);
+            Line_To (Cr, G (L - 8.0), G (W * 0.3));
+            Close_Path (Cr);
+            Color (0.2, 0.2, 0.22);
+            Fill (Cr);
+            New_Path (Cr);
+            Rectangle (Cr, G (-L + 6.0), G (-W), 9.0, G (2.0 * W));
+            Linear (0.0, -W, 0.0, W, (0.9, 0.9, 0.85), (0.55, 0.55, 0.5));
+            Fill (Cr);
+            New_Path (Cr);
+            Round_Box (-L, -W, 8.0, 2.0 * W, 3.0);
+            Color (0.93, 0.55, 0.6);
+            Fill (Cr);
+         when Board_Bridge =>
+            --  a chopping board, its grain along it, a hole to hang it by
+            New_Path (Cr);
+            Round_Box (-L, -W, 2.0 * L, 2.0 * W, 10.0);
+            Linear (0.0, -W, 0.0, W, (0.86, 0.70, 0.48), (0.70, 0.54, 0.33));
+            Fill (Cr);
+            Set_Line_Width (Cr, 1.0);
+            for K in 1 .. 7 loop
+               declare
+                  Y : constant Float := -W + 2.0 * W * Float (K) / 8.0;
+               begin
+                  Move_To (Cr, G (-L + 8.0), G (Y));
+                  Curve_To (Cr, G (-L * 0.3), G (Y + 3.0), G (L * 0.3), G (Y - 3.0), G (L - 8.0), G (Y));
+               end;
+            end loop;
+            Color (0.55, 0.40, 0.22, 0.45);
+            Stroke (Cr);
+            New_Path (Cr);
+            Disc (-L + 14.0, 0.0, 5.0);
+            Color (0.0, 0.0, 0.0, 0.55);
+            Fill (Cr);
+            Set_Line_Width (Cr, 2.0);
+            Color (0.40, 0.28, 0.15);
+            New_Path (Cr);
+            Round_Box (-L, -W, 2.0 * L, 2.0 * W, 10.0);
+            Stroke (Cr);
+         when Spoon_Bridge =>
+            --  a wooden spoon: its bowl rests on the far table
+            New_Path (Cr);
+            Round_Box (-L, -W, 2.0 * L - 30.0, 2.0 * W, W);
+            Linear (0.0, -W, 0.0, W, (0.88, 0.70, 0.45), (0.66, 0.48, 0.27));
+            Fill (Cr);
+            New_Path (Cr);
+            Save (Cr);
+            Translate (Cr, G (L - 26.0), 0.0);
+            Cairo.Scale (Cr, 34.0, G (W * 1.5));
+            Arc (Cr, 0.0, 0.0, 1.0, 0.0, 2.0 * Pi);
+            Restore (Cr);
+            Radial (L - 30.0, 0.0, 36.0, (0.70, 0.52, 0.30), (0.85, 0.66, 0.42));
+            Fill (Cr);
+            Set_Line_Width (Cr, 1.0);
+            Color (0.55, 0.40, 0.22, 0.5);
+            Move_To (Cr, G (-L + 6.0), 0.0);
+            Line_To (Cr, G (L - 60.0), 0.0);
+            Stroke (Cr);
+      end case;
+      Restore (Cr);
+   end Draw_Bridge;
+
+   --  Between the tables: the floor far below, the tables' edges and
+   --  shadows, and the bridges across
+   procedure Paint_Drops is
+      Side : constant RGB :=
+        (case Tracks.Theme is
+            when Workbench => (0.36, 0.22, 0.12),
+            when Desk => (0.38, 0.25, 0.13),
+            when Kitchen => (0.60, 0.60, 0.64),
+            when others => (0.40, 0.30, 0.22));
+   begin
+      if Tracks.Table_Count < 2 then
+         return;
+      end if;
+      Save (Cr);
+      New_Path (Cr);
+      Rectangle (Cr, 0.0, 0.0, G (Tracks.Width), G (Tracks.Height));
+      for K in 1 .. Tracks.Table_Count loop
+         declare
+            T : constant Table_Rect := Get_Table (K);
+         begin
+            Rectangle (Cr, G (T.X0), G (T.Y0), G (T.X1 - T.X0), G (T.Y1 - T.Y0));
+         end;
+      end loop;
+      Set_Fill_Rule (Cr, Cairo_Fill_Rule_Even_Odd);
+      Clip (Cr);
+      Set_Fill_Rule (Cr, Cairo_Fill_Rule_Winding);
+      New_Path (Cr);
+      Rectangle (Cr, 0.0, 0.0, G (Tracks.Width), G (Tracks.Height));
+      Fill_Tile (Floor_Below);
+      for K in 1 .. Tracks.Table_Count loop
+         declare
+            T : constant Table_Rect := Get_Table (K);
+         begin
+            for J in 1 .. 6 loop
+               New_Path (Cr);
+               Rectangle (Cr, G (T.X0 + 20.0 - Float (J) * 3.0), G (T.Y0 + 30.0 - Float (J) * 3.0),
+                          G (T.X1 - T.X0 + Float (J) * 6.0), G (T.Y1 - T.Y0 + Float (J) * 6.0));
+               Color (0.0, 0.0, 0.0, 0.12);
+               Fill (Cr);
+            end loop;
+            --  the edge of the top, seen past it
+            New_Path (Cr);
+            Rectangle (Cr, G (T.X0), G (T.Y1), G (T.X1 - T.X0), 16.0);
+            Color (Side);
+            Fill (Cr);
+            New_Path (Cr);
+            Rectangle (Cr, G (T.X0), G (T.Y1 + 14.0), G (T.X1 - T.X0), 2.0);
+            Color (0.0, 0.0, 0.0, 0.3);
+            Fill (Cr);
+         end;
+      end loop;
+      --  the bridges' shadows, down on the floor
+      for K in 1 .. Tracks.Bridge_Count loop
+         declare
+            Sh : Shape := Bridge_Shape (Get_Bridge (K));
+         begin
+            Sh.C := Sh.C + (22.0, 34.0);
+            New_Path (Cr);
+            Save (Cr);
+            Translate (Cr, G (Sh.C.X), G (Sh.C.Y));
+            Rotate (Cr, G (Sh.A));
+            Rectangle (Cr, G (-Sh.RX), G (-Sh.RY), G (2.0 * Sh.RX), G (2.0 * Sh.RY));
+            Restore (Cr);
+            Color (0.0, 0.0, 0.0, 0.32);
+            Fill (Cr);
+         end;
+      end loop;
+      Restore (Cr);
+      for K in 1 .. Tracks.Bridge_Count loop
+         Draw_Bridge (Get_Bridge (K));
+      end loop;
+   end Paint_Drops;
+
    procedure Build is
       use Cairo.Image_Surface;
       PW : constant Gint := Gint (Tracks.Width * Scale);
@@ -4124,6 +4355,7 @@ package body Art is
             Draw_Item (Get_Item (I));
          end if;
       end loop;
+      Paint_Drops;
       Paint_Border;
       if Tracks.Theme = Fish_Tank then
          --  under water: a blue-green cast, and the light rippling over it all

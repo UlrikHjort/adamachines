@@ -46,8 +46,8 @@ package Tracks is
       Boost,    --  a push forward
       Bump);    --  low enough for a monster truck to roll over; in the way of the rest
 
-   Track_Count : constant := 34;
-   First_Custom : constant := 30;    --  the tracks made in the editor: 30 .. 34
+   Track_Count : constant := 37;
+   First_Custom : constant := 33;    --  the tracks made in the editor: 33 .. 37
    Custom_Slots : constant := 5;
    subtype Custom_Slot is Positive range 1 .. Custom_Slots;
    subtype Track_Id is Positive range 1 .. Track_Count;
@@ -161,10 +161,31 @@ package Tracks is
 
    --  The workbench is a table: outside its top there is only the floor far below
    function Has_Table return Boolean;
-   function Table_Left return Float;
+   function Table_Left return Float;     --  round all the tables
    function Table_Top return Float;
    function Table_Right return Float;
    function Table_Bottom return Float;
+
+   --  Some tracks run over several tables, with bridges between them:
+   --  off a bridge between two tables, there is only the floor far below
+   type Table_Rect is record
+      X0, Y0, X1, Y1 : Float := 0.0;
+   end record;
+   function Table_Count return Natural;   --  0 on a track that is not on tables
+   function Get_Table (I : Positive) return Table_Rect;
+   function On_Table (P : Vec; Margin : Float := 0.0) return Boolean;
+
+   type Bridge_Kind is (Ruler_Bridge, Books_Bridge, Pencil_Bridge, Board_Bridge, Spoon_Bridge);
+   type Bridge is record
+      Kind  : Bridge_Kind := Ruler_Bridge;
+      A, B  : Vec;              --  its ends, on the tables either side
+      Width : Float := 40.0;
+   end record;
+   function Bridge_Count return Natural;
+   function Get_Bridge (I : Positive) return Bridge;
+   function Bridge_Shape (B : Bridge) return Shape;   --  the box it covers
+   function Samples_To_Bridge (I : Integer) return Natural;
+   --  How many samples from I to the next bridge ahead: 0 on one, Natural'Last with none
 
    procedure Grid_Slot (K : Positive; P : out Vec; Heading : out Float);
    --  The K-th place on the starting grid

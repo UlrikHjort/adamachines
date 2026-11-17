@@ -34,6 +34,15 @@ package body Tracks is
 
    type Name_Access is access constant String;
 
+   type Rect_List is array (Positive range <>) of Table_Rect;
+   type Rect_List_Access is access constant Rect_List;
+   type Bridge_Spec is record
+      Kind  : Bridge_Kind;
+      Width : Float;
+   end record;
+   type Bridge_Spec_List is array (Positive range <>) of Bridge_Spec;
+   type Bridge_Spec_Access is access constant Bridge_Spec_List;
+
    type Definition is record
       Name     : Name_Access;
       Theme    : Theme_Kind;
@@ -43,6 +52,8 @@ package body Tracks is
       Seed_0   : Seed;
       Hazards  : Natural := 0;  --  how many things move across; 0: as many as the place has
       Walls    : Boolean := False;   --  off the road it is all thick going (a canyon of cloud)
+      Tables   : Rect_List_Access := null;     --  several tables, with the floor between them
+      Bridges  : Bridge_Spec_Access := null;   --  across the gaps, in the order they are crossed
    end record;
 
    Workbench_Name : aliased constant String := "WORKBENCH RUN";
@@ -275,6 +286,54 @@ package body Tracks is
       (F_Gap, 5, 0.52, 0.0, 44.0),
       (F_Water, 7, 0.5, 0.4, 30.0));
 
+   --  Over the gaps between tables, on whatever lies across them.  The road
+   --  goes straight across each gap; the bridges are laid along it.
+
+   Ruler_Name : aliased constant String := "RULER RUN";
+   Ruler_Points : aliased constant Point_List :=
+     ((450.0, 880.0, 100.0), (190.0, 760.0, 100.0), (170.0, 430.0, 100.0), (380.0, 240.0, 95.0),
+      (760.0, 230.0, 90.0), (1390.0, 230.0, 90.0), (1800.0, 250.0, 95.0), (1990.0, 450.0, 100.0),
+      (1890.0, 700.0, 100.0), (1730.0, 860.0, 95.0), (1520.0, 880.0, 90.0), (760.0, 880.0, 90.0));
+   Ruler_Features : aliased constant Feature_List :=
+     ((F_Boost, 3, 0.5, 0.0, 30.0),
+      (F_Water, 7, 0.55, 0.35, 34.0),
+      (F_Solid, 8, 0.5, -0.5, 14.0),
+      (F_Sand, 1, 0.5, 0.3, 34.0));
+   Ruler_Tables : aliased constant Rect_List :=
+     ((0.0, 0.0, 960.0, 1100.0), (1190.0, 0.0, 2160.0, 1100.0));
+   Ruler_Bridges : aliased constant Bridge_Spec_List :=
+     ((Ruler_Bridge, 42.0), (Ruler_Bridge, 38.0));
+
+   Homework_Name : aliased constant String := "HOMEWORK HOP";
+   Homework_Points : aliased constant Point_List :=
+     ((420.0, 800.0, 100.0), (160.0, 660.0, 100.0), (160.0, 360.0, 100.0), (360.0, 210.0, 95.0),
+      (640.0, 210.0, 90.0), (1210.0, 210.0, 90.0), (1450.0, 340.0, 90.0), (1660.0, 210.0, 90.0),
+      (2260.0, 210.0, 90.0), (2650.0, 260.0, 95.0), (2800.0, 500.0, 100.0), (2650.0, 760.0, 95.0),
+      (2260.0, 800.0, 90.0), (1660.0, 800.0, 90.0), (1450.0, 670.0, 90.0), (1210.0, 800.0, 90.0),
+      (640.0, 800.0, 90.0));
+   Homework_Features : aliased constant Feature_List :=
+     ((F_Water, 2, 0.5, -0.3, 34.0),
+      (F_Boost, 10, 0.4, 0.0, 30.0),
+      (F_Sand, 14, 0.5, 0.3, 30.0));
+   Homework_Tables : aliased constant Rect_List :=
+     ((0.0, 0.0, 800.0, 1000.0), (1050.0, 0.0, 1850.0, 1000.0), (2100.0, 0.0, 2960.0, 1000.0));
+   Homework_Bridges : aliased constant Bridge_Spec_List :=
+     ((Ruler_Bridge, 42.0), (Books_Bridge, 56.0), (Pencil_Bridge, 32.0), (Ruler_Bridge, 40.0));
+
+   Counter_Name : aliased constant String := "COUNTER TOP";
+   Counter_Points : aliased constant Point_List :=
+     ((620.0, 150.0, 95.0), (1000.0, 150.0, 95.0), (1360.0, 230.0, 90.0), (1500.0, 420.0, 85.0),
+      (1500.0, 1150.0, 85.0), (1560.0, 1420.0, 95.0), (1300.0, 1600.0, 100.0), (900.0, 1600.0, 100.0),
+      (720.0, 1460.0, 95.0), (700.0, 1180.0, 85.0), (700.0, 420.0, 85.0), (460.0, 300.0, 90.0));
+   Counter_Features : aliased constant Feature_List :=
+     ((F_Water, 1, 0.5, 0.3, 34.0),
+      (F_Boost, 7, 0.5, 0.0, 30.0),
+      (F_Sand, 8, 0.5, -0.3, 30.0));
+   Counter_Tables : aliased constant Rect_List :=
+     ((300.0, 0.0, 1760.0, 620.0), (480.0, 930.0, 1760.0, 1760.0));
+   Counter_Bridges : aliased constant Bridge_Spec_List :=
+     ((Board_Bridge, 64.0), (Spoon_Bridge, 30.0));
+
    Hockey_Name : aliased constant String := "HOCKEY RINK";
    Hockey_Points : aliased constant Point_List :=
      ((700.0, 300.0, 120.0), (1500.0, 300.0, 120.0), (1900.0, 500.0, 115.0), (1900.0, 850.0, 115.0),
@@ -472,7 +531,13 @@ package body Tracks is
       (Easter_Name'Access, Easter, Easter_Points'Access, Easter_Features'Access, 90, 157, others => <>),
       (Chess_Name'Access, Chess, Chess_Points'Access, Chess_Features'Access, 50, 163, others => <>),
       (Alien_Name'Access, Alien, Alien_Points'Access, Alien_Features'Access, 80, 167, others => <>),
-      (Arctic_Name'Access, Arctic, Arctic_Points'Access, Arctic_Features'Access, 80, 173, others => <>));
+      (Arctic_Name'Access, Arctic, Arctic_Points'Access, Arctic_Features'Access, 80, 173, others => <>),
+      (Ruler_Name'Access, Workbench, Ruler_Points'Access, Ruler_Features'Access, 50, 179,
+       Tables => Ruler_Tables'Access, Bridges => Ruler_Bridges'Access, others => <>),
+      (Homework_Name'Access, Desk, Homework_Points'Access, Homework_Features'Access, 70, 181,
+       Tables => Homework_Tables'Access, Bridges => Homework_Bridges'Access, others => <>),
+      (Counter_Name'Access, Kitchen, Counter_Points'Access, Counter_Features'Access, 60, 191,
+       Tables => Counter_Tables'Access, Bridges => Counter_Bridges'Access, others => <>));
 
    function Name (Id : Track_Id) return String is
      (if Is_Custom (Id) then "MY TRACK" & Integer'Image (Slot_Of (Id)) else Defs (Id).Name.all);
@@ -530,6 +595,13 @@ package body Tracks is
    Loaded : Track_Id := 1;
    World_W, World_H : Float := 1000.0;
    Table_X0, Table_Y0, Table_X1, Table_Y1 : Float := 0.0;
+   Max_Tables : constant := 6;
+   Tables_Of : array (1 .. Max_Tables) of Table_Rect;
+   N_Tables : Natural := 0;
+   Max_Bridges : constant := 8;
+   Bridges_Of : array (1 .. Max_Bridges) of Bridge;
+   N_Bridges : Natural := 0;
+   Bridge_First, Bridge_Last : array (1 .. Max_Bridges) of Integer := (others => 0);   --  its samples
 
    Cell : constant Float := 2.0;
    type Material_Array is array (Natural range <>) of Material;
@@ -618,7 +690,51 @@ package body Tracks is
       end case;
    end Mover_At;
    function Get_Item (I : Positive) return Item is (Items (I));
-   function Has_Table return Boolean is (Theme_Of (Loaded) = Workbench);
+   function Has_Table return Boolean is (N_Tables > 0);
+   function Table_Count return Natural is (N_Tables);
+   function Get_Table (I : Positive) return Table_Rect is (Tables_Of (I));
+   function Bridge_Count return Natural is (N_Bridges);
+   function Get_Bridge (I : Positive) return Bridge is (Bridges_Of (I));
+
+   function On_Table (P : Vec; Margin : Float := 0.0) return Boolean is
+   begin
+      for K in 1 .. N_Tables loop
+         declare
+            T : Table_Rect renames Tables_Of (K);
+         begin
+            if P.X >= T.X0 + Margin and then P.X <= T.X1 - Margin
+              and then P.Y >= T.Y0 + Margin and then P.Y <= T.Y1 - Margin
+            then
+               return True;
+            end if;
+         end;
+      end loop;
+      return False;
+   end On_Table;
+
+   function Samples_To_Bridge (I : Integer) return Natural is
+      J : constant Natural := I mod N_Samples;
+      Best : Natural := Natural'Last;
+   begin
+      for K in 1 .. N_Bridges loop
+         declare
+            F : constant Natural := Bridge_First (K);
+            L : constant Natural := Bridge_Last (K);
+            On : constant Boolean := (if F <= L then J in F .. L else J >= F or else J <= L);
+         begin
+            if On then
+               return 0;
+            end if;
+            Best := Natural'Min (Best, (F - J) mod N_Samples);
+         end;
+      end loop;
+      return Best;
+   end Samples_To_Bridge;
+
+   Bridge_Overlap : constant := 26.0;   --  how far a bridge lies on the tables either side
+
+   function Bridge_Shape (B : Bridge) return Shape is
+     ((Box, (B.A + B.B) * 0.5, Angle_Of (B.B - B.A), Distance (B.A, B.B) * 0.5 + Bridge_Overlap, B.Width * 0.5));
    function Table_Left return Float is (Table_X0);
    function Table_Top return Float is (Table_Y0);
    function Table_Right return Float is (Table_X1);
@@ -1116,6 +1232,9 @@ package body Tracks is
       begin
          if Has_Table then
             X0 := Table_X0; Y0 := Table_Y0; X1 := Table_X1; Y1 := Table_Y1;
+            if not On_Table (It.S.C, E + 12.0) then
+               return False;   --  over the floor between the tables
+            end if;
          else
             X0 := 0.0; Y0 := 0.0; X1 := World_W; Y1 := World_H;
          end if;
@@ -1328,6 +1447,17 @@ package body Tracks is
                         Clear := False;
                      end if;
                   end loop;
+                  if Has_Table then
+                     --  on a table, and not on a bridge
+                     declare
+                        S : constant Sample := Get (J);
+                        Across : constant Vec := Perp (S.T) * (S.Width * 0.5 + 45.0);
+                     begin
+                        if not On_Table (S.P + Across, 10.0) or else not On_Table (S.P - Across, 10.0) then
+                           Clear := False;
+                        end if;
+                     end;
+                  end if;
                   if Kind = Train then
                      --  its rails must cross the road here and nowhere else
                      declare
@@ -1418,9 +1548,11 @@ package body Tracks is
       if Has_Table then
          Use_Material (Void);
          Paint (Cr);
-         Use_Material (Floor);
-         Rectangle (Cr, Gdouble (Table_X0), Gdouble (Table_Y0),
-                    Gdouble (Table_X1 - Table_X0), Gdouble (Table_Y1 - Table_Y0));
+         Use_Material ((if Walled then Sand else Floor));
+         for K in 1 .. N_Tables loop
+            Rectangle (Cr, Gdouble (Tables_Of (K).X0), Gdouble (Tables_Of (K).Y0),
+                       Gdouble (Tables_Of (K).X1 - Tables_Of (K).X0), Gdouble (Tables_Of (K).Y1 - Tables_Of (K).Y0));
+         end loop;
          Fill (Cr);
       else
          Use_Material ((if Walled then Sand else Floor));
@@ -1438,6 +1570,25 @@ package body Tracks is
       Fill (Cr);
       Items_Of (Solids => False);
       Items_Of (Solids => True);
+      if N_Tables > 1 then
+         --  between the tables only the floor far below, but for the bridges
+         Use_Material (Void);
+         New_Path (Cr);
+         Rectangle (Cr, 0.0, 0.0, Gdouble (World_W), Gdouble (World_H));
+         for K in 1 .. N_Tables loop
+            Rectangle (Cr, Gdouble (Tables_Of (K).X0), Gdouble (Tables_Of (K).Y0),
+                       Gdouble (Tables_Of (K).X1 - Tables_Of (K).X0), Gdouble (Tables_Of (K).Y1 - Tables_Of (K).Y0));
+         end loop;
+         Set_Fill_Rule (Cr, Cairo_Fill_Rule_Even_Odd);
+         Fill (Cr);
+         Set_Fill_Rule (Cr, Cairo_Fill_Rule_Winding);
+         Use_Material (Road);
+         for K in 1 .. N_Bridges loop
+            New_Path (Cr);
+            Shape_Path (Cr, Bridge_Shape (Bridges_Of (K)));
+            Fill (Cr);
+         end loop;
+      end if;
       if not Has_Table then
          --  the hedge or the snow bank round the edge
          Use_Material (Solid);
@@ -1474,6 +1625,76 @@ package body Tracks is
    end Build_Map;
 
    procedure Load_From (Id : Track_Id; Def : Definition; Pts : Point_List);
+
+   --  Where the road leaves one table for another, a bridge along it: the
+   --  road between is put straight onto it, and narrows to it on the way
+   procedure Lay_Bridges (Specs : Bridge_Spec_List) is
+      Start : Natural := 0;
+      Taper : constant := 12;   --  samples to narrow over, either side
+      Keep : array (0 .. N_Samples - 1) of Float;
+   begin
+      for K in 0 .. N_Samples - 1 loop
+         Keep (K) := Samples (K).Width;
+      end loop;
+      --  from a sample on a table, so that no gap is cut in two
+      while Start < N_Samples - 1 and then not On_Table (Samples (Start).P) loop
+         Start := Start + 1;
+      end loop;
+      declare
+         K : Natural := 0;
+      begin
+         while K < N_Samples loop
+            declare
+               I : constant Natural := (Start + K) mod N_Samples;
+            begin
+               if not On_Table (Samples (I).P) and then N_Bridges < Max_Bridges then
+                  declare
+                     First : constant Integer := Start + K;   --  the first off the table
+                     Last : Integer := First;
+                     A, B : Vec;
+                     Spec : constant Bridge_Spec := Specs (Specs'First + N_Bridges mod Specs'Length);
+                  begin
+                     while not On_Table (Get (Last + 1).P) loop
+                        Last := Last + 1;
+                     end loop;
+                     A := Get (First - 1).P;
+                     B := Get (Last + 1).P;
+                     N_Bridges := N_Bridges + 1;
+                     Bridges_Of (N_Bridges) := (Spec.Kind, A, B, Spec.Width);
+                     Bridge_First (N_Bridges) := First mod N_Samples;
+                     Bridge_Last (N_Bridges) := Last mod N_Samples;
+                     --  the road across: straight, as wide as the bridge
+                     for J in First .. Last loop
+                        declare
+                           S : Sample renames Samples (J mod N_Samples);
+                        begin
+                           S.P := Lerp (A, B, Float (J - First + 1) / Float (Last - First + 2));
+                           S.T := Normal (B - A);
+                           S.Width := Spec.Width;
+                           S.Turn := 0.0;
+                        end;
+                     end loop;
+                     --  and narrowing to it on the tables either side
+                     for D in 0 .. Taper loop
+                        declare
+                           F : constant Float := Float (D) / Float (Taper);
+                           Before : constant Natural := (First - 1 - D) mod N_Samples;
+                           After : constant Natural := (Last + 1 + D) mod N_Samples;
+                        begin
+                           Samples (Before).Width := Float'Min (Samples (Before).Width,
+                                                                Spec.Width + (Keep (Before) - Spec.Width) * F);
+                           Samples (After).Width := Float'Min (Samples (After).Width,
+                                                               Spec.Width + (Keep (After) - Spec.Width) * F);
+                        end;
+                     end loop;
+                     K := K + (Last - First) + 1;
+                  end;
+               end if;
+            end;
+            K := K + 1;
+         end loop;
+      end;
+   end Lay_Bridges;
 
    procedure Load (Id : Track_Id) is
    begin
@@ -1526,7 +1747,32 @@ package body Tracks is
          Max_X := Float'Max (Max_X, Samples (K).P.X + Samples (K).Width * 0.5);
          Max_Y := Float'Max (Max_Y, Samples (K).P.Y + Samples (K).Width * 0.5);
       end loop;
-      if Def.Theme = Workbench then
+      N_Tables := 0;
+      N_Bridges := 0;
+      if Def.Tables /= null then
+         --  several tables, as they are given, with the floor round them all
+         Min_X := Float'Last;
+         Min_Y := Float'Last;
+         Max_X := Float'First;
+         Max_Y := Float'First;
+         for T of Def.Tables.all loop
+            Min_X := Float'Min (Min_X, T.X0);
+            Min_Y := Float'Min (Min_Y, T.Y0);
+            Max_X := Float'Max (Max_X, T.X1);
+            Max_Y := Float'Max (Max_Y, T.Y1);
+         end loop;
+         Shift := (Below - Min_X, Below - Min_Y);
+         World_W := Max_X - Min_X + 2.0 * Below;
+         World_H := Max_Y - Min_Y + 2.0 * Below;
+         for T of Def.Tables.all loop
+            N_Tables := N_Tables + 1;
+            Tables_Of (N_Tables) := (T.X0 + Shift.X, T.Y0 + Shift.Y, T.X1 + Shift.X, T.Y1 + Shift.Y);
+         end loop;
+         Table_X0 := Below;
+         Table_Y0 := Below;
+         Table_X1 := World_W - Below;
+         Table_Y1 := World_H - Below;
+      elsif Def.Theme = Workbench then
          Shift := (Below + Margin - Min_X, Below + Margin - Min_Y);
          World_W := Max_X - Min_X + 2.0 * (Margin + Below);
          World_H := Max_Y - Min_Y + 2.0 * (Margin + Below);
@@ -1534,6 +1780,8 @@ package body Tracks is
          Table_Y0 := Below;
          Table_X1 := World_W - Below;
          Table_Y1 := World_H - Below;
+         N_Tables := 1;
+         Tables_Of (1) := (Table_X0, Table_Y0, Table_X1, Table_Y1);
       else
          Shift := (Margin - Min_X, Margin - Min_Y);
          World_W := Max_X - Min_X + 2.0 * Margin;
@@ -1542,6 +1790,9 @@ package body Tracks is
       for K in 0 .. N_Samples - 1 loop
          Samples (K).P := Samples (K).P + Shift;
       end loop;
+      if Def.Bridges /= null then
+         Lay_Bridges (Def.Bridges.all);
+      end if;
       Add_Features (Def);
       Add_Clutter (Def);
       Add_Movers (Def);

@@ -452,6 +452,11 @@ package body Race is
          R.Lane_T := 0.2;
          Choose_Lane (I);
       end if;
+      if Tracks.Samples_To_Bridge (R.Index) < 34 then
+         --  a bridge just ahead, or under the wheels: the middle of it, and nowhere else
+         R.Lane_Target := 0.0;
+         R.Lane := R.Lane + Clamp (-R.Lane, -3.0 * Dt, 3.0 * Dt);
+      end if;
       R.Lane := R.Lane + Clamp (R.Lane_Target - R.Lane, -1.3 * Dt, 1.3 * Dt);
 
       --  As fast as the bends ahead allow, braking in time for them

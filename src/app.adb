@@ -59,7 +59,7 @@ package body App is
    --  The ways to play
    type Play_Mode is (Race_1P, Race_2P, Duel_2P, Champ, Trial_1P, Net_Game);
    type Cup_Kind is (Car_Cup, House_Cup, Speed_Cup, Water_Air_Cup, Holiday_Cup, Strange_Cup, Frozen_Cup,
-                     Grand_Tour);
+                     Bridge_Cup, Grand_Tour);
    type Track_List is array (Positive range <>) of Tracks.Track_Id;
    Car_Tracks : constant Track_List := (1, 2, 3, 4, 14, 15);
    House_Tracks : constant Track_List := (11, 16, 20, 15);
@@ -68,9 +68,10 @@ package body App is
    Odd_Tracks : constant Track_List := (27, 28, 24, 20);
    Speed_Tracks : constant Track_List := (9, 10, 12, 13, 22, 24);
    Water_Air_Tracks : constant Track_List := (5, 6, 17, 19, 7, 8, 18);
+   Bridge_Tracks : constant Track_List := (30, 31, 15, 32);   --  across the gaps, and over them
    All_Tracks : constant Track_List :=
      (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29);
+      27, 28, 29, 30, 31, 32);
 
    function Cup_Tracks (C : Cup_Kind) return Track_List is
      (case C is
@@ -81,6 +82,7 @@ package body App is
          when Frozen_Cup => Frozen_Tracks,
          when Speed_Cup => Speed_Tracks,
          when Water_Air_Cup => Water_Air_Tracks,
+         when Bridge_Cup => Bridge_Tracks,
          when Grand_Tour => All_Tracks);
 
    function Cup_Name (C : Cup_Kind) return String is
@@ -92,6 +94,7 @@ package body App is
          when Frozen_Cup => "SNOW AND ICE CUP",
          when Speed_Cup => "SPEED CUP",
          when Water_Air_Cup => "WATER AND AIR CUP",
+         when Bridge_Cup => "BRIDGE CUP",
          when Grand_Tour => "GRAND TOUR");
 
    Champ_Points_Table : constant array (1 .. 6) of Natural := (10, 7, 5, 3, 2, 1);

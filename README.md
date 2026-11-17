@@ -7,8 +7,9 @@ and moon rovers racing round the house, in Ada and GtkAda. Seen from above, they
 workbench, a garden, a frozen pond, the bath, a bedroom, the sky, the kitchen floor, a muddy
 backyard, a pool table, a school desk, a beach, a model railway, a fish tank, a dark attic, a
 birthday party, a garage, round a Christmas tree, across a moon base, over a pumpkin patch at
-Halloween, through an Easter egg hunt, across a chess board, on an alien planet and through
-the Arctic on snowmobiles. Pick-ups give you turbos, shields, oil and homing rockets. Things move
+Halloween, through an Easter egg hunt, across a chess board, on an alien planet, through
+the Arctic on snowmobiles, and from table to table over rulers, books, pencils and wooden
+spoons. Pick-ups give you turbos, shields, oil and homing rockets. Things move
 across the road, and you can build tracks of your own. One player races the AI, in single races,
 championships or time trials against a ghost of their best lap. Two players share a keyboard
 and a screen, in a race or a duel. Up to eight race each other over the network, with AI drivers
@@ -111,8 +112,9 @@ In the menus: ↑ ↓ to choose, ← → to change, Enter to select, Esc to go b
   six (bikes, tanks, hovercraft, monster trucks and rovers), and the *Water and Air Cup* seven.
   The *Holiday Cup* has four (Birthday Party, Halloween, Christmas and Easter), and the *Strange
   Worlds Cup* four (Chess Board, Alien Planet, Moon Base and Attic at Night). The *Snow and Ice
-  Cup* has four (Frozen Pond, Hockey Rink, Arctic Safari and Christmas Tree). The *Grand Tour*
-  runs all 29 tracks. The
+  Cup* has four (Frozen Pond, Hockey Rink, Arctic Safari and Christmas Tree). The *Bridge Cup*
+  has four (Ruler Run, Homework Hop, Workbench Leap and Counter Top). The *Grand Tour* runs all
+  32 tracks. The
   standings are shown after every round, and the champion is crowned at the end.
 - **Time trial**: alone against the clock and the ghost of your best lap, which is kept for
   every track.
@@ -195,6 +197,13 @@ Each setting has its own vehicle, its own clutter and something that moves acros
 | *Chess Board*: a strip of baize across the board, between pawns, rooks, bishops, queens and kings | sports cars | a leaping knight |
 | *Alien Planet*: purple ground, glowing crystals, tentacle plants, egg pods and pools of goo | flying saucers | slime blobs |
 | *Arctic Safari*: a packed snow trail past igloos, ice blocks and seals, over frozen lakes, with holes cut for ice fishing | snowmobiles | penguins and a polar bear |
+| *Ruler Run*: two workbenches side by side. Out over one steel rule and back over the other, with the floor far below. | sports cars | a glass marble |
+| *Homework Hop*: three school desks in a row, crossed on a ruler, a row of exercise books and a pencil barely wider than a tank | tanks | a wind-up robot |
+| *Counter Top*: from the kitchen counter down to the table over a chopping board, and back up along a wooden spoon | road racing bikes | a tennis ball |
+
+On the bridge tracks the road narrows onto each bridge. Drive off the side and you fall to the
+floor and are put back on the road, a few seconds lost. A bump from another car on a bridge can
+be enough to knock you off.
 
 Each vehicle handles in its own way:
 
